@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Bell, MapPin } from 'lucide-react'
+import { Bell, CalendarDays, MapPin } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
 import { api } from '../../utils/api'
 import Avatar from '../common/Avatar'
@@ -57,6 +57,14 @@ export default function TopHeader() {
       </div>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+        <button
+          type="button"
+          aria-label="Events"
+          onClick={() => navigate('/events')}
+          style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '8px', color: 'var(--color-text-secondary)' }}
+        >
+          <CalendarDays size={21} />
+        </button>
         <button
           onClick={() => navigate('/notifications')}
           style={{

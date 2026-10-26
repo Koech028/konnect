@@ -2,6 +2,8 @@ import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import FeedFilter from '../components/feed/FeedFilter'
 import FeedPost from '../components/feed/FeedPost'
+import DailyPromptCard from '../components/feed/DailyPromptCard'
+import StoriesBar from '../components/feed/StoriesBar'
 import { useAppData } from '../context/AppDataContext'
 import { useAuth } from '../context/AuthContext'
 
@@ -22,6 +24,11 @@ export default function FeedPage() {
 
   return (
     <div style={{ padding: 'var(--space-md)' }}>
+      <StoriesBar />
+      <DailyPromptCard />
+      <Link to="/shorts" style={shortsLinkStyle}>
+        Explore quick video moments <span aria-hidden="true">→</span>
+      </Link>
       <Link to="/create" style={{ display: 'block', padding: '16px', marginBottom: 'var(--space-md)', background: 'var(--color-surface)', borderRadius: 'var(--radius-lg)', boxShadow: 'var(--shadow-sm)', color: 'var(--color-text-secondary)', textDecoration: 'none', fontSize: '15px' }}>
         Share a moment, create a poll, or post an event...
       </Link>
@@ -37,3 +44,4 @@ export default function FeedPage() {
 }
 
 const emptyStyle = { padding: '24px', textAlign: 'center', color: 'var(--color-text-secondary)' }
+const shortsLinkStyle = { display: 'flex', justifyContent: 'space-between', padding: '14px 16px', marginBottom: 'var(--space-md)', borderRadius: 'var(--radius-lg)', background: 'var(--color-primary-soft)', color: 'var(--color-primary-dark)', textDecoration: 'none', fontSize: 14, fontWeight: 700 }

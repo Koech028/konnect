@@ -5,6 +5,8 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.notifications.models import Notification, NotificationPreference
+from apps.notifications.models import PushSubscription
+from apps.notifications.push_serializers import PushSubscriptionSerializer
 from apps.notifications.serializers import NotificationPreferenceSerializer, NotificationSerializer
 
 
@@ -36,3 +38,46 @@ class NotificationPreferencesView(APIView):
         serializer.is_valid(raise_exception=True)
         serializer.save()
         return Response(serializer.data)
+
+
+class PushConfigView(APIView):
+    def get(self, request):
+        from django.conf import settings
+        return Response({'public_key': settings.VAPID_PUBLIC_KEY})
+
+
+class PushSubscriptionView(APIView):
+    def get(self, request):
+        return Response({'subscribed': PushSubscription.objects.filter(user=request.user).exists()})
+
+    def post(self, request):
+        serializer = PushSubscriptionSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        endpoint = serializer.validated_data['endpoint']
+        if (
+            not PushSubscription.objects.filter(endpoint=endpoint).exists()
+            and PushSubscription.objects.filter(user=request.user).count() >= 10
+        ):
+            return Response({'detail': 'This account has reached the browser subscription limit.'}, status=status.HTTP_429_TOO_MANY_REQUESTS)
+        subscription, created = PushSubscription.objects.get_or_create(
+            endpoint=endpoint,
+            defaults={
+                'user': request.user,
+                'p256dh': serializer.validated_data['p256dh'],
+                'auth': serializer.validated_data['auth'],
+            },
+        )
+        if not created and subscription.user_id != request.user.id:
+            return Response({'detail': 'This browser subscription is already registered.'}, status=status.HTTP_409_CONFLICT)
+        if not created:
+            subscription.p256dh = serializer.validated_data['p256dh']
+            subscription.auth = serializer.validated_data['auth']
+            subscription.save(update_fields=('p256dh', 'auth', 'updated_at'))
+        return Response({'subscribed': True}, status=status.HTTP_201_CREATED if created else status.HTTP_200_OK)
+
+    def delete(self, request):
+        endpoint = request.data.get('endpoint')
+        if not isinstance(endpoint, str) or not endpoint:
+            return Response({'endpoint': ['A subscription endpoint is required.']}, status=status.HTTP_400_BAD_REQUEST)
+        PushSubscription.objects.filter(user=request.user, endpoint=endpoint).delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)

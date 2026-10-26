@@ -29,6 +29,7 @@ export default function MessageBubble({ message, isMe }) {
           textAlign: 'right'
         }}>
           {formatTime(message.created_at)}
+          {isMe && message.read_at && <span aria-label="Read"> · Read</span>}
         </span>
       </div>
     </div>

@@ -1,3 +1,8 @@
+from datetime import timedelta
+from urllib.parse import quote
+
+from django.utils import timezone
+from django.utils.dateparse import parse_datetime
 from rest_framework.test import APITestCase
 
 from apps.accounts.models import User
@@ -51,3 +56,43 @@ class MatchingApiTests(APITestCase):
         received = self.client.get(f'/api/v1/matches/{match_id}/messages/')
         self.assertEqual(received.status_code, 200)
         self.assertEqual(received.data[0]['text'], 'Hello from the API')
+        self.assertIsNotNone(received.data[0]['read_at'])
+
+        self.client.force_authenticate(self.first)
+        sent_message = self.client.get(f'/api/v1/matches/{match_id}/messages/')
+        self.assertIsNotNone(sent_message.data[0]['read_at'])
+        cursor = (
+            parse_datetime(sent_message.data[0]['created_at']) + timedelta(seconds=1)
+        ).isoformat()
+        from apps.messaging.models import Message
+        Message.objects.filter(pk=sent.data['id']).update(read_at=timezone.now() + timedelta(seconds=2))
+        receipt_update = self.client.get(
+            f'/api/v1/matches/{match_id}/messages/?after={quote(cursor)}',
+        )
+        self.assertEqual([item['id'] for item in receipt_update.data], [sent.data['id']])
+
+    def test_message_activity_reports_typing_and_respects_match_permissions(self):
+        match, _ = Match.create_for_users(self.first, self.second)
+        self.client.force_authenticate(self.first)
+        typing = self.client.post(
+            f'/api/v1/matches/{match.id}/messages/activity/',
+            {'typing': True},
+            format='json',
+        )
+        self.assertEqual(typing.status_code, 200)
+        self.assertFalse(typing.data['other_user_typing'])
+
+        self.client.force_authenticate(self.second)
+        activity = self.client.get(f'/api/v1/matches/{match.id}/messages/activity/')
+        self.assertTrue(activity.data['other_user_typing'])
+
+        self.client.force_authenticate(self.first)
+        cleared = self.client.post(
+            f'/api/v1/matches/{match.id}/messages/activity/',
+            {'typing': False},
+            format='json',
+        )
+        self.assertFalse(cleared.data['other_user_typing'])
+        self.client.force_authenticate(self.second)
+        activity = self.client.get(f'/api/v1/matches/{match.id}/messages/activity/')
+        self.assertFalse(activity.data['other_user_typing'])

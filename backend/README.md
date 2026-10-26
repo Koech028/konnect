@@ -13,7 +13,9 @@ backend/
     posts/                Feed posts, likes, comments, polls
     matching/             Profile likes and mutual matches
     messaging/             Match conversations
-    notifications/        Notifications and notification preferences
+    livestreams/           Live video rooms, credit wallets, and gifts
+    community/              24-hour stories and dating events
+    notifications/         Notifications and notification preferences
     safety/               Blocks and user reports
   manage.py
   requirements.txt
@@ -98,7 +100,7 @@ The React app currently has the password-request screen only. Add a `/reset-pass
 | GET | `/api/v1/discover/?q=&gender=&age_min=&age_max=&verified=` | Search/filter active profiles |
 | GET, POST | `/api/v1/profiles/me/photos/` | List or add photo URL records (maximum 6) |
 | PATCH, DELETE | `/api/v1/profiles/me/photos/{photo_id}/` | Update or remove an owned photo |
-| POST | `/api/v1/media/upload-url/` | Request a short-lived authenticated R2 image upload URL |
+| POST | `/api/v1/media/upload-url/` | Request a short-lived authenticated R2 image or video upload URL |
 | GET, POST | `/api/v1/profiles/me/verification/` | Read or submit a verification request |
 | GET, POST | `/api/v1/posts/` | Paginated feed or create a post |
 | GET, PATCH, DELETE | `/api/v1/posts/{post_id}/` | Read or manage an owned post |
@@ -112,13 +114,53 @@ The React app currently has the password-request screen only. Add a `/reset-pass
 | GET | `/api/v1/matches/` | Paginated matches |
 | GET | `/api/v1/matches/{match_id}/` | Read a match |
 | GET, POST | `/api/v1/matches/{match_id}/messages/` | List or send match messages |
+| GET, POST | `/api/v1/matches/{match_id}/messages/activity/` | Read typing state or update your typing status |
 | GET | `/api/v1/notifications/` | Paginated notifications |
 | POST | `/api/v1/notifications/read-all/` | Mark all notifications read |
 | POST | `/api/v1/notifications/{notification_id}/read/` | Mark one notification read |
 | GET, PATCH | `/api/v1/settings/notifications/` | Read/update notification preferences |
+| GET | `/api/v1/settings/push/config/` | Read the public browser-push key |
+| GET, POST, DELETE | `/api/v1/settings/push/subscription/` | Read, register, or remove your browser push subscription |
+| GET, POST | `/api/v1/stories/` | List active stories or create a 24-hour story |
+| DELETE | `/api/v1/stories/{story_id}/` | Delete your own story |
+| GET, POST | `/api/v1/shorts/` | Browse recent Shorts or publish a short video |
+| GET, DELETE | `/api/v1/shorts/{short_id}/` | Read a Short or delete your own |
+| POST | `/api/v1/shorts/{short_id}/watch/` | Record one view per signed-in user |
+| POST | `/api/v1/shorts/{short_id}/like/` | Toggle a like |
+| GET, POST | `/api/v1/shorts/{short_id}/comments/` | List or add comments |
+| GET, POST | `/api/v1/prompts/today/` | Read or save your private daily prompt answer |
+| GET, POST | `/api/v1/events/` | List upcoming events or create one |
+| GET, POST | `/api/v1/events/{event_id}/` | Read an event or toggle your RSVP |
+| GET | `/api/v1/premium/` | Read your current premium tier and entitlements |
 | GET, POST | `/api/v1/safety/blocks/` | List or block profiles (`user_id`) |
 | DELETE | `/api/v1/safety/blocks/{block_id}/` | Unblock a profile |
 | GET, POST | `/api/v1/safety/reports/` | List or submit a report |
+| GET, POST | `/api/v1/live/` | List live streams or start one |
+| GET | `/api/v1/live/wallet/` | Read virtual credit balance and gift catalog |
+| GET | `/api/v1/live/{stream_id}/` | Read a live stream |
+| POST | `/api/v1/live/{stream_id}/join/` | Get a short-lived LiveKit room token |
+| POST | `/api/v1/live/{stream_id}/end/` | End a stream (host only) |
+| POST | `/api/v1/live/{stream_id}/gifts/` | Send a virtual gift using credits |
+
+## Live video and virtual gifts
+
+For the simplest setup, create a LiveKit Cloud project and copy its server URL, API key, and API secret into `LIVEKIT_URL`, `LIVEKIT_API_KEY`, and `LIVEKIT_API_SECRET` in `backend/.env`. Restart Django after changing the file. For deployment, set the same three variables as secrets on the `linkup-api` service. Never expose the API secret to the browser. A stream is unavailable until these settings are present. Only the host receives publish permissions; signed-in viewers receive subscribe-only video access. Account blocks also hide and prevent joining each other's streams.
+
+New wallets start with 100 virtual credits. Roses cost 10 credits, hearts 25, and stars 50; gifts transfer credits to the host. Credits have no cash value, are not purchasable, and cannot be withdrawn. These starter credits are a launch/testing system, not a payment or payout feature.
+
+## Stories, events, verification, and premium
+
+Stories can contain text, an image, or a short video and expire after 24 hours. Shorts are videos up to 60 seconds in the client, with likes, comments, and deduplicated signed-in views. Both use the signed R2 upload flow; images are capped at 5 MB, and MP4, WebM, and QuickTime uploads at 50 MB. Video duration is checked in the browser and the declared duration is validated by the API; upload processing/transcoding and server-side media inspection are not included. Blocking an author hides their stories and Shorts and prevents interactions.
+
+The daily conversation prompt changes each day. Answers are private to the account and can be edited during that day; participation is optional. Events are visible to signed-in users, use a public venue description, and support capacity-limited RSVPs. Blocking a host hides their events and prevents event access.
+
+Verification requests are reviewed by staff in Django Admin. Select pending requests and use **Approve selected verification requests** or **Reject selected verification requests**; users are notified of the decision. This flow deliberately does not collect identity documents.
+
+Premium status is an administrator-managed entitlement during this beta. It adds the profile badge; there is no checkout, billing, or self-service promotion. Set the user's subscription tier in Django Admin only when granting premium.
+
+Browser push uses the standard Web Push protocol. Generate a VAPID key pair from the backend virtual environment with `.\.venv\Scripts\vapid.exe --gen --json --applicationServerKey`. Put the public and private keys in the local `backend/.env` as `VAPID_PUBLIC_KEY` and `VAPID_PRIVATE_KEY`, and set `VAPID_CLAIMS_EMAIL` to a real contact email. The public key is exposed only through the authenticated configuration endpoint; never put the private key in frontend variables. Serve the frontend over HTTPS (localhost is supported for development) and users can enable push in Settings. Invalid/expired browser subscriptions are removed automatically.
+
+On Render, set the three VAPID values once as secrets for the `linkup-api` service in `render.yaml`; the frontend does not need a VAPID build variable. Include the application's sender email (for example, `support@example.com`) as `VAPID_CLAIMS_EMAIL`. Do not commit either key.
 
 ## Request/response shapes
 
@@ -141,7 +183,7 @@ Profile responses contain the UI's `location: {city, country}`, `photos` URL lis
 
 ## Important boundaries before launch
 
-* Verification requests are pending records only. Do not send identity documents to this API; connect a secure verification provider and review workflow first.
+* Verification decisions require authorized staff review. Do not upload identity documents through this feature.
 * Reports are stored for staff review; blocking immediately hides profiles and prevents further likes/messages.
 * Email reset delivery uses the console backend locally. Configure and test real delivery before production.
 * Rate limits and JWT authentication are enabled, but production still needs HTTPS, a production database, secret management, backups, monitoring, and deployment hardening.

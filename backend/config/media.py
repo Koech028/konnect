@@ -11,28 +11,37 @@ from rest_framework.views import APIView
 
 class MediaStorageUnavailable(APIException):
     status_code = status.HTTP_503_SERVICE_UNAVAILABLE
-    default_detail = 'Image uploads are not configured on this server.'
+    default_detail = 'Media uploads are not configured on this server.'
     default_code = 'media_storage_unavailable'
 
 
 class MediaUploadUrlView(APIView):
     allowed_types = {
-        'image/jpeg': 'jpg',
-        'image/png': 'png',
-        'image/webp': 'webp',
+        'image/jpeg': ('jpg', 5 * 1024 * 1024),
+        'image/png': ('png', 5 * 1024 * 1024),
+        'image/webp': ('webp', 5 * 1024 * 1024),
+        'video/mp4': ('mp4', 50 * 1024 * 1024),
+        'video/webm': ('webm', 50 * 1024 * 1024),
+        'video/quicktime': ('mov', 50 * 1024 * 1024),
     }
-    max_size = 5 * 1024 * 1024
 
     def post(self, request):
-        content_type = request.data.get('content_type')
+        content_type = request.data.get('content_type', '')
+        if isinstance(content_type, str):
+            content_type = content_type.split(';', 1)[0].strip().lower()
         try:
             size = int(request.data.get('size', 0))
         except (TypeError, ValueError) as exc:
             raise ValidationError({'size': 'Provide the image size in bytes.'}) from exc
         if content_type not in self.allowed_types:
-            raise ValidationError({'content_type': 'Upload a JPEG, PNG, or WebP image.'})
-        if not 0 < size <= self.max_size:
-            raise ValidationError({'size': 'Images must be between 1 byte and 5 MB.'})
+            raise ValidationError({
+                'content_type': 'Upload a JPEG, PNG, WebP, MP4, WebM, or QuickTime video.'
+            })
+        extension, max_size = self.allowed_types[content_type]
+        if not 0 < size <= max_size:
+            max_mb = max_size // (1024 * 1024)
+            media_kind = 'Videos' if content_type.startswith('video/') else 'Images'
+            raise ValidationError({'size': f'{media_kind} must be between 1 byte and {max_mb} MB.'})
 
         account_id = os.environ.get('CLOUDFLARE_ACCOUNT_ID', '').strip()
         access_key = os.environ.get('CLOUDFLARE_R2_ACCESS_KEY_ID', '').strip()
@@ -44,7 +53,7 @@ class MediaUploadUrlView(APIView):
         if not public_url.startswith('https://'):
             raise MediaStorageUnavailable('CLOUDFLARE_R2_PUBLIC_URL must use HTTPS.')
 
-        key = f'{request.user.pk}/{uuid.uuid4().hex}.{self.allowed_types[content_type]}'
+        key = f'{request.user.pk}/{uuid.uuid4().hex}.{extension}'
         client = boto3.client(
             's3',
             endpoint_url=f'https://{account_id}.r2.cloudflarestorage.com',

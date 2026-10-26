@@ -108,6 +108,7 @@ export default function ProfileCard({ user, onLike, liked }) {
               <span style={{ fontSize: '10px' }}>✓</span> Verified
             </Badge>
           )}
+          {user.subscription_tier === 'premium' && <Badge variant="premium" size="sm">✦ Premium</Badge>}
         </div>
 
         <div style={{

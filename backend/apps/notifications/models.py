@@ -11,6 +11,7 @@ class Notification(models.Model):
         INTEREST = 'interest', 'Interest'
         POST_INTERACTION = 'post_interaction', 'Post interaction'
         COMMENT = 'comment', 'Comment'
+        VERIFICATION = 'verification', 'Verification'
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     recipient = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='notifications')
@@ -37,4 +38,14 @@ class NotificationPreference(models.Model):
     messages = models.BooleanField(default=True)
     likes = models.BooleanField(default=True)
     posts = models.BooleanField(default=True)
+    push_enabled = models.BooleanField(default=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+
+class PushSubscription(models.Model):
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='push_subscriptions')
+    endpoint = models.URLField(max_length=2048, unique=True)
+    p256dh = models.CharField(max_length=200)
+    auth = models.CharField(max_length=100)
+    created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

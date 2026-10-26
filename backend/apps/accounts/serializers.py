@@ -14,9 +14,9 @@ class UserSerializer(serializers.ModelSerializer):
         fields = (
             'id', 'display_name', 'age', 'gender', 'bio', 'location',
             'photos', 'avatar', 'interests', 'verification_status',
-            'profile_status',
+            'profile_status', 'subscription_tier',
         )
-        read_only_fields = ('id', 'verification_status', 'profile_status')
+        read_only_fields = ('id', 'verification_status', 'profile_status', 'subscription_tier')
 
     def get_location(self, obj):
         return {'city': obj.city, 'country': obj.country}

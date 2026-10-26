@@ -140,6 +140,9 @@ export default function ProfileHeader({ user, isOwnProfile = false, onEdit, onLi
               <span style={{ fontSize: '11px' }}>✓</span> Verified
             </Badge>
           )}
+          {profileUser.subscription_tier === 'premium' && (
+            <Badge variant="premium" size="md">✦ Premium</Badge>
+          )}
         </div>
 
         <div style={{

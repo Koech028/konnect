@@ -1,9 +1,11 @@
 import { useLocation, useNavigate } from 'react-router-dom'
-import { Home, Search, MessageCircle, User, PlusCircle } from 'lucide-react'
+import { Home, Search, MessageCircle, User, PlusCircle, Video, Film } from 'lucide-react'
 
 const navItems = [
   { path: '/', icon: Home, label: 'Feed' },
   { path: '/discover', icon: Search, label: 'Discover' },
+  { path: '/shorts', icon: Film, label: 'Shorts' },
+  { path: '/live', icon: Video, label: 'Live' },
   { path: '/create', icon: PlusCircle, label: 'Post' },
   { path: '/messages', icon: MessageCircle, label: 'Messages' },
   { path: '/profile', icon: User, label: 'Profile' }
@@ -43,12 +45,13 @@ export default function BottomNav() {
             key={item.path}
             onClick={() => navigate(item.path)}
             style={{
+              flex: 1,
               display: 'flex',
               flexDirection: 'column',
               alignItems: 'center',
               justifyContent: 'center',
               gap: '3px',
-              padding: '8px 16px',
+              padding: '8px 4px',
               background: 'none',
               border: 'none',
               cursor: 'pointer',
@@ -59,9 +62,9 @@ export default function BottomNav() {
           >
             <Icon size={22} strokeWidth={active ? 2.5 : 1.5} />
             <span style={{
-              fontSize: '10px',
+              fontSize: '9px',
               fontWeight: active ? 600 : 500,
-              letterSpacing: '0.2px'
+              letterSpacing: 0
             }}>
               {item.label}
             </span>

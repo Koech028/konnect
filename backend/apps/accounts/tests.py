@@ -63,6 +63,24 @@ class AccountApiTests(APITestCase):
         self.assertEqual(response.status_code, 200)
         self.assertNotIn('email', response.data)
         self.assertNotIn('preferences', response.data)
+        self.assertEqual(response.data['subscription_tier'], User.SubscriptionTier.FREE)
+
+    def test_premium_status_is_read_only_and_billing_is_not_enabled(self):
+        user = User.objects.create_user(
+            email='tier@example.com',
+            password='Mango!Sunrise_2026',
+            display_name='Tier User',
+            age=25,
+            gender='woman',
+        )
+        self.client.force_authenticate(user)
+        response = self.client.get('/api/v1/premium/')
+        self.assertEqual(response.data['tier'], User.SubscriptionTier.FREE)
+        self.assertFalse(response.data['billing_enabled'])
+
+        update = self.client.patch('/api/v1/profiles/me/', {'subscription_tier': 'premium'}, format='json')
+        self.assertEqual(update.status_code, 200)
+        self.assertEqual(update.data['subscription_tier'], User.SubscriptionTier.FREE)
 
     def test_registration_rejects_underage_user(self):
         response = self.client.post('/api/v1/auth/register/', {

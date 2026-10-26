@@ -11,9 +11,12 @@ export default function VerificationPage() {
 
   useEffect(() => {
     api.get('/api/v1/profiles/me/verification/')
-      .then(response => setStatus(response.status))
+      .then(response => {
+        setStatus(response.status)
+        if (response.status === 'verified' || response.status === 'rejected') refreshUser()
+      })
       .catch(err => setError(err.message || 'Verification status could not be loaded.'))
-  }, [])
+  }, [refreshUser])
 
   const submitRequest = async () => {
     try {
@@ -42,7 +45,9 @@ export default function VerificationPage() {
               ? 'Your account currently has verified status.'
               : status === 'pending'
                 ? 'Your request is pending review. We will update your profile when it has been reviewed.'
-                : 'Request a profile review. Do not upload identity documents or sensitive personal information.'}
+                : status === 'rejected'
+                  ? 'Your request was not approved. You may request another review. Do not upload identity documents or sensitive personal information.'
+                  : 'Request a profile review. Do not upload identity documents or sensitive personal information.'}
           </p>
           {!isVerified && status !== 'pending' && (
             <>

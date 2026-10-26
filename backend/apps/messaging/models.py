@@ -16,3 +16,14 @@ class Message(models.Model):
 
     class Meta:
         ordering = ('created_at',)
+
+
+class MessageActivity(models.Model):
+    match = models.ForeignKey(Match, on_delete=models.CASCADE, related_name='activities')
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='message_activities')
+    typing_until = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=('match', 'user'), name='unique_match_message_activity'),
+        ]
