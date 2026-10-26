@@ -16,4 +16,4 @@ class NotificationSerializer(serializers.ModelSerializer):
 class NotificationPreferenceSerializer(serializers.ModelSerializer):
     class Meta:
         model = NotificationPreference
-        fields = ('messages', 'likes', 'posts')
+        fields = ('messages', 'likes', 'posts', 'push_enabled')

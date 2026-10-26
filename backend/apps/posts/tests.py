@@ -110,6 +110,32 @@ class PostApiTests(APITestCase):
         self.assertEqual(params['ContentLength'], 128)
         self.assertIn(str(self.reader.id), params['Key'])
 
+    def test_video_upload_url_is_signed_with_50_mb_limit(self):
+        with patch.dict(os.environ, {
+            'CLOUDFLARE_ACCOUNT_ID': 'account',
+            'CLOUDFLARE_R2_ACCESS_KEY_ID': 'access',
+            'CLOUDFLARE_R2_SECRET_ACCESS_KEY': 'secret',
+            'CLOUDFLARE_R2_BUCKET': 'linkup-media',
+            'CLOUDFLARE_R2_PUBLIC_URL': 'https://media.example.com',
+        }), patch('config.media.boto3.client') as create_client:
+            create_client.return_value.generate_presigned_url.return_value = 'https://signed.example.com/put'
+            response = self.client.post('/api/v1/media/upload-url/', {
+                'content_type': 'video/webm;codecs=vp8',
+                'size': 50 * 1024 * 1024,
+            }, format='json')
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.data['url'].endswith('.webm'))
+        params = create_client.return_value.generate_presigned_url.call_args.kwargs['Params']
+        self.assertEqual(params['ContentType'], 'video/webm')
+        self.assertEqual(params['ContentLength'], 50 * 1024 * 1024)
+
+        too_large = self.client.post('/api/v1/media/upload-url/', {
+            'content_type': 'video/mp4',
+            'size': 50 * 1024 * 1024 + 1,
+        }, format='json')
+        self.assertEqual(too_large.status_code, 400)
+
     def test_image_upload_url_rejects_unsupported_media(self):
         response = self.client.post('/api/v1/media/upload-url/', {
             'content_type': 'image/svg+xml',

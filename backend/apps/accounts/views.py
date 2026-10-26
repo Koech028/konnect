@@ -61,6 +61,16 @@ class CurrentUserView(APIView):
         return Response(CurrentUserSerializer(request.user, context={'request': request}).data)
 
 
+class PremiumStatusView(APIView):
+    def get(self, request):
+        return Response({
+            'tier': request.user.subscription_tier,
+            'active': request.user.subscription_tier == get_user_model().SubscriptionTier.PREMIUM,
+            'benefits': ['Premium profile badge'],
+            'billing_enabled': False,
+        })
+
+
 class PasswordResetRequestView(APIView):
     permission_classes = (permissions.AllowAny,)
     throttle_classes = (throttling.ScopedRateThrottle,)

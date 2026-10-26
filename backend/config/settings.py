@@ -39,6 +39,8 @@ INSTALLED_APPS = [
     'apps.messaging',
     'apps.notifications',
     'apps.safety',
+    'apps.livestreams',
+    'apps.community',
 ]
 
 MIDDLEWARE = [
@@ -104,6 +106,13 @@ STORAGES = {
 }
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
+LIVEKIT_URL = os.environ.get('LIVEKIT_URL', '').strip()
+LIVEKIT_API_KEY = os.environ.get('LIVEKIT_API_KEY', '').strip()
+LIVEKIT_API_SECRET = os.environ.get('LIVEKIT_API_SECRET', '').strip()
+VAPID_PUBLIC_KEY = os.environ.get('VAPID_PUBLIC_KEY', '').strip()
+VAPID_PRIVATE_KEY = os.environ.get('VAPID_PRIVATE_KEY', '').strip()
+VAPID_CLAIMS_EMAIL = os.environ.get('VAPID_CLAIMS_EMAIL', '').strip()
+
 CORS_ALLOWED_ORIGINS = [
     origin.strip()
     for origin in os.environ.get('FRONTEND_ORIGIN', 'http://localhost:3000,http://127.0.0.1:3000').split(',')
@@ -141,6 +150,11 @@ REST_FRAMEWORK = {
         'anon': '60/minute',
         'user': '300/minute',
         'auth': '10/minute',
+        'story-write': '20/day',
+        'short-write': '10/day',
+        'short-comment': '60/hour',
+        'daily-prompt': '10/day',
+        'event-write': '30/hour',
     },
 }
 

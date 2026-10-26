@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { Bell, Shield, BadgeCheck, LockKeyhole, LogOut, Moon, Sun, ChevronRight, UserRound } from 'lucide-react'
+import { Bell, Shield, BadgeCheck, LockKeyhole, LogOut, Moon, Sun, ChevronRight, UserRound, Sparkles } from 'lucide-react'
 import PageHeader from '../components/common/PageHeader'
 import { useAuth } from '../context/AuthContext'
 import { useTheme } from '../context/ThemeContext'
 import { api } from '../utils/api'
+import { disablePushNotifications, enablePushNotifications, getPushState } from '../utils/pushNotifications'
 
 export default function SettingsPage() {
   const navigate = useNavigate()
@@ -20,11 +21,16 @@ export default function SettingsPage() {
   })
   const [saved, setSaved] = useState('')
   const [error, setError] = useState('')
+  const [pushState, setPushState] = useState({ supported: false, subscribed: false, permission: 'default' })
+  const [pushBusy, setPushBusy] = useState(false)
 
   useEffect(() => {
     api.get('/api/v1/settings/notifications/')
       .then(setNotifications)
       .catch(err => setError(err.message || 'Notification preferences could not be loaded.'))
+    getPushState()
+      .then(setPushState)
+      .catch(err => setError(err.message || 'Push notification status could not be loaded.'))
   }, [])
 
   const saveNotifications = async (key, checked) => {
@@ -35,6 +41,26 @@ export default function SettingsPage() {
       setError('')
     } catch (err) {
       setError(err.message || 'Could not save notification preferences.')
+    }
+
+    const togglePush = async () => {
+      setPushBusy(true)
+      try {
+        if (pushState.subscribed) {
+          await disablePushNotifications()
+          setPushState(current => ({ ...current, subscribed: false }))
+          setSaved('Browser push notifications disabled.')
+        } else {
+          await enablePushNotifications()
+          setPushState(current => ({ ...current, subscribed: true, permission: 'granted' }))
+          setSaved('Browser push notifications enabled.')
+        }
+        setError('')
+      } catch (err) {
+        setError(err.message || 'Push notification settings could not be updated.')
+      } finally {
+        setPushBusy(false)
+      }
     }
   }
 
@@ -93,6 +119,7 @@ export default function SettingsPage() {
           <h2 style={titleStyle}>Your account</h2>
           <SettingLink to="/profile/edit" icon={<UserRound size={18} />} title="Edit profile" description="Update your details and photos" />
           <SettingLink to="/verification" icon={<BadgeCheck size={18} />} title="Profile verification" description="Request a verification review" />
+          <SettingLink to="/premium" icon={<Sparkles size={18} />} title="LinkUp Premium" description="View your plan and available benefits" />
           <SettingLink to="/safety" icon={<Shield size={18} />} title="Safety center" description="Manage reports and blocked profiles" />
           <SettingLink to="/forgot-password" icon={<LockKeyhole size={18} />} title="Password help" description="Request a password reset email" />
         </section>
@@ -162,7 +189,15 @@ export default function SettingsPage() {
           <SettingRow icon={<Bell size={18} />} title="Post activity" description="Comments and reactions">
             <input type="checkbox" checked={notifications.posts} onChange={event => saveNotifications('posts', event.target.checked)} aria-label="Post activity notifications" style={switchStyle} />
           </SettingRow>
-          <p style={helperStyle}>These preferences control which activity is recorded for your account.</p>
+          <SettingRow icon={<Bell size={18} />} title="Browser push" description={pushState.supported ? 'Get alerts when LinkUp is closed' : 'Push is not supported in this browser'}>
+            <button type="button" disabled={!pushState.supported || pushBusy} onClick={togglePush} style={pushButtonStyle}>
+              {pushBusy ? '…' : pushState.subscribed ? 'Disable' : 'Enable'}
+            </button>
+          </SettingRow>
+          <SettingRow icon={<Bell size={18} />} title="Push preference" description="Allow activity notifications to reach this browser">
+            <input type="checkbox" checked={notifications.push_enabled ?? true} onChange={event => saveNotifications('push_enabled', event.target.checked)} aria-label="Push notification preference" style={switchStyle} />
+          </SettingRow>
+          <p style={helperStyle}>Push delivery also requires the browser permission and server-side VAPID configuration.</p>
         </section>
 
         {error && <p role="alert" style={errorStyle}>{error}</p>}
@@ -212,3 +247,4 @@ const helperStyle = { fontSize: '12px', color: 'var(--color-text-muted)', lineHe
 const errorStyle = { color: 'var(--color-error)', fontSize: '14px', margin: '0 0 12px' }
 const successStyle = { color: 'var(--color-success)', fontSize: '14px', margin: '0 0 12px' }
 const logoutStyle = { width: '100%', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px', padding: '14px', border: '1px solid var(--color-error)', borderRadius: 'var(--radius-lg)', background: 'transparent', color: 'var(--color-error)', font: 'inherit', fontWeight: 600, cursor: 'pointer' }
+const pushButtonStyle = { padding: '7px 12px', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-full)', background: 'var(--color-surface)', color: 'var(--color-primary)', font: 'inherit', fontSize: 12, fontWeight: 700, cursor: 'pointer' }

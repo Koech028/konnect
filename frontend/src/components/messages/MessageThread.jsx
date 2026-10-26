@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom'
 import MessageBubble from './MessageBubble'
 import Avatar from '../common/Avatar'
 
-export default function MessageThread({ match, messages, currentUserId, onSendMessage }) {
+export default function MessageThread({ match, messages, currentUserId, otherUserTyping, onTyping, onSendMessage }) {
   const [newMessage, setNewMessage] = useState('')
   const messagesEndRef = useRef(null)
   const navigate = useNavigate()
@@ -91,6 +91,7 @@ export default function MessageThread({ match, messages, currentUserId, onSendMe
             isMe={message.sender_id === currentUserId}
           />
         ))}
+        {otherUserTyping && <p role="status" style={{ padding: '0 var(--space-md)', color: 'var(--color-text-secondary)', fontSize: 13 }}>Typing…</p>}
         <div ref={messagesEndRef} />
       </div>
 
@@ -109,7 +110,10 @@ export default function MessageThread({ match, messages, currentUserId, onSendMe
         <input
           type="text"
           value={newMessage}
-          onChange={(e) => setNewMessage(e.target.value)}
+          onChange={(e) => {
+            setNewMessage(e.target.value)
+            if (e.target.value.trim()) onTyping?.()
+          }}
           placeholder="Type a message..."
           style={{
             flex: 1,

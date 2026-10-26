@@ -1,6 +1,10 @@
 from rest_framework.test import APITestCase
+from django.contrib.admin.sites import AdminSite
+from django.test import RequestFactory
 
 from apps.accounts.models import User
+from apps.profiles.admin import VerificationRequestAdmin
+from apps.profiles.models import VerificationRequest
 
 
 class ProfileApiTests(APITestCase):
@@ -65,3 +69,24 @@ class ProfileApiTests(APITestCase):
         self.assertEqual(response.status_code, 200)
         self.assertFalse(response.data['messages'])
         self.assertFalse(response.data['posts'])
+
+    def test_admin_can_approve_verification_without_uploading_identity_documents(self):
+        request = VerificationRequest.objects.create(user=self.user)
+        admin_user = User.objects.create_superuser(
+            email='moderator@example.com',
+            password='Mango!Sunrise_2026',
+            display_name='Moderator',
+            age=35,
+            gender='other',
+        )
+        admin_request = RequestFactory().post('/admin/profiles/verificationrequest/')
+        admin_request.user = admin_user
+        model_admin = VerificationRequestAdmin(VerificationRequest, AdminSite())
+
+        model_admin.approve_requests(admin_request, VerificationRequest.objects.filter(pk=request.pk))
+
+        request.refresh_from_db()
+        self.user.refresh_from_db()
+        self.assertEqual(request.status, VerificationRequest.Status.APPROVED)
+        self.assertEqual(request.reviewed_by, admin_user)
+        self.assertEqual(self.user.verification_status, User.VerificationStatus.VERIFIED)

@@ -47,6 +47,10 @@ class User(AbstractUser):
         ACTIVE = 'active', 'Active'
         HIDDEN = 'hidden', 'Hidden'
 
+    class SubscriptionTier(models.TextChoices):
+        FREE = 'free', 'Free'
+        PREMIUM = 'premium', 'Premium'
+
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     email = models.EmailField(unique=True)
     display_name = models.CharField(max_length=40)
@@ -68,7 +72,7 @@ class User(AbstractUser):
         choices=ProfileStatus.choices,
         default=ProfileStatus.ACTIVE,
     )
-    subscription_tier = models.CharField(max_length=20, default='free')
+    subscription_tier = models.CharField(max_length=20, choices=SubscriptionTier.choices, default=SubscriptionTier.FREE)
     created_at = models.DateTimeField(auto_now_add=True)
     last_active = models.DateTimeField(auto_now=True)
 

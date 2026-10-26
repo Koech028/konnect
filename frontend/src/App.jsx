@@ -1,3 +1,4 @@
+import { lazy, Suspense } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { useAuth } from './context/AuthContext'
 import AppLayout from './components/layout/AppLayout'
@@ -19,6 +20,11 @@ import ForgotPasswordPage from './pages/ForgotPasswordPage'
 import VerificationPage from './pages/VerificationPage'
 import SafetyPage from './pages/SafetyPage'
 import ResetPasswordPage from './pages/ResetPasswordPage'
+import LivePage from './pages/LivePage'
+import EventsPage from './pages/EventsPage'
+import PremiumPage from './pages/PremiumPage'
+import ShortsPage from './pages/ShortsPage'
+const LiveRoomPage = lazy(() => import('./pages/LiveRoomPage'))
 
 function ProtectedRoute({ children }) {
   const { isAuthenticated, isLoading } = useAuth()
@@ -66,6 +72,11 @@ export default function App() {
         <Route path="/likes" element={<LikesPage />} />
         <Route path="/verification" element={<VerificationPage />} />
         <Route path="/safety" element={<SafetyPage />} />
+        <Route path="/live" element={<LivePage />} />
+        <Route path="/shorts" element={<ShortsPage />} />
+        <Route path="/events" element={<EventsPage />} />
+        <Route path="/premium" element={<PremiumPage />} />
+        <Route path="/live/:streamId" element={<Suspense fallback={<div role="status" style={{ padding: 24 }}>Loading live room…</div>}><LiveRoomPage /></Suspense>} />
         <Route path="/notifications" element={<NotificationsPage />} />
       </Route>
     </Routes>
