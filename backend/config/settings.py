@@ -154,6 +154,8 @@ REST_FRAMEWORK = {
         'short-write': '10/day',
         'short-comment': '60/hour',
         'daily-prompt': '10/day',
+        'content-report': '10/day',
+        'media-upload': '40/hour',
         'event-write': '30/hour',
     },
 }

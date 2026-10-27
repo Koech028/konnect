@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { Image, X, CalendarDays } from 'lucide-react'
+import { Image, X, CalendarDays, Video } from 'lucide-react'
 import PageHeader from '../components/common/PageHeader'
 import { useAuth } from '../context/AuthContext'
 import { useAppData } from '../context/AppDataContext'
-import { uploadImage } from '../utils/uploadImage'
+import { getVideoDuration, uploadImage, uploadVideo } from '../utils/uploadImage'
 
 const cardStyle = {
   background: 'var(--color-surface)',
@@ -39,6 +39,7 @@ export default function CreatePostPage() {
   const [options, setOptions] = useState(existingPost?.content?.poll_options || ['', ''])
   const [error, setError] = useState('')
   const [isSaving, setIsSaving] = useState(false)
+  const [isUploadingMedia, setIsUploadingMedia] = useState(false)
 
   useEffect(() => {
     if (!postId) return
@@ -69,15 +70,36 @@ export default function CreatePostPage() {
   }
 
   const handleImage = async (event) => {
-    const file = event.target.files?.[0]
+    const input = event.currentTarget
+    const file = input.files?.[0]
     if (!file) return
+    setIsUploadingMedia(true)
+    setError('')
     try {
       setMedia(await uploadImage(file))
-      setError('')
     } catch (err) {
       setError(err.message)
+    } finally {
+      setIsUploadingMedia(false)
+      input.value = ''
     }
-    event.target.value = ''
+  }
+
+  const handleVideo = async event => {
+    const input = event.currentTarget
+    const file = input.files?.[0]
+    if (!file) return
+    setIsUploadingMedia(true)
+    setError('')
+    try {
+      await getVideoDuration(file)
+      setMedia(await uploadVideo(file))
+    } catch (err) {
+      setError(err.message || 'The video could not be uploaded.')
+    } finally {
+      setIsUploadingMedia(false)
+      input.value = ''
+    }
   }
 
   const handleSubmit = async (event) => {
@@ -127,9 +149,10 @@ export default function CreatePostPage() {
       <PageHeader title={existingPost ? 'Edit post' : 'Create a post'} />
       <form onSubmit={handleSubmit} style={cardStyle}>
         <label htmlFor="post-type" style={{ display: 'block', fontSize: '14px', fontWeight: 600, marginBottom: '8px' }}>Post type</label>
-        <select id="post-type" value={type} onChange={event => setType(event.target.value)} style={{ ...fieldStyle, marginBottom: '16px' }}>
+        <select id="post-type" value={type} disabled={isUploadingMedia} onChange={event => { setType(event.target.value); setMedia('') }} style={{ ...fieldStyle, marginBottom: '16px' }}>
           <option value="status">Status</option>
           <option value="photo">Photo</option>
+          <option value="video">Video</option>
           <option value="poll">Poll</option>
           <option value="event">Event</option>
         </select>
@@ -184,13 +207,29 @@ export default function CreatePostPage() {
                 <button type="button" onClick={() => setMedia('')} aria-label="Remove image" style={{ ...iconButtonStyle, position: 'absolute', top: '8px', right: '8px', background: 'var(--color-surface)' }}><X size={18} /></button>
               </div>
             )}
+
+            {type === 'video' && (
+              <div style={{ marginTop: '16px' }}>
+                <label htmlFor="post-video" style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px', fontWeight: 600, marginBottom: '8px' }}>
+                  <Video size={18} /> Add a short video
+                </label>
+                <input id="post-video" type="file" accept="video/mp4,video/webm,video/quicktime" onChange={handleVideo} />
+                {media && (
+                  <div style={{ position: 'relative', marginTop: '12px' }}>
+                    <video src={media} controls playsInline preload="metadata" style={{ display: 'block', width: '100%', maxHeight: '400px', borderRadius: 'var(--radius-md)', background: '#111' }} />
+                    <button type="button" onClick={() => setMedia('')} aria-label="Remove video" style={{ ...iconButtonStyle, position: 'absolute', top: '8px', right: '8px', background: 'var(--color-surface)' }}><X size={18} /></button>
+                  </div>
+                )}
+                <p style={{ fontSize: '12px', color: 'var(--color-text-muted)', marginTop: '6px' }}>MP4, WebM, or QuickTime; up to 60 seconds and 50 MB. Uploads go directly to configured cloud storage.</p>
+              </div>
+            )}
             <p style={{ fontSize: '12px', color: 'var(--color-text-muted)', marginTop: '6px' }}>Images are securely uploaded to cloud storage. Maximum source file size: 5 MB.</p>
           </div>
         )}
 
         {error && <p role="alert" style={{ color: 'var(--color-error)', marginTop: '12px', fontSize: '14px' }}>{error}</p>}
-        <button type="submit" disabled={isSaving} style={primaryButtonStyle}>
-          {isSaving ? 'Saving...' : existingPost ? 'Save changes' : 'Publish post'}
+        <button type="submit" disabled={isSaving || isUploadingMedia} style={primaryButtonStyle}>
+          {isUploadingMedia ? 'Uploading media...' : isSaving ? 'Saving...' : existingPost ? 'Save changes' : 'Publish post'}
         </button>
       </form>
     </>

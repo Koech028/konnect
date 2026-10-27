@@ -23,6 +23,7 @@ export default function SettingsPage() {
   const [error, setError] = useState('')
   const [pushState, setPushState] = useState({ supported: false, subscribed: false, permission: 'default' })
   const [pushBusy, setPushBusy] = useState(false)
+  const [notificationBusy, setNotificationBusy] = useState(false)
 
   useEffect(() => {
     api.get('/api/v1/settings/notifications/')
@@ -34,6 +35,7 @@ export default function SettingsPage() {
   }, [])
 
   const saveNotifications = async (key, checked) => {
+    setNotificationBusy(true)
     try {
       const savedPreferences = await api.patch('/api/v1/settings/notifications/', { [key]: checked })
       setNotifications(savedPreferences)
@@ -41,26 +43,30 @@ export default function SettingsPage() {
       setError('')
     } catch (err) {
       setError(err.message || 'Could not save notification preferences.')
+      setSaved('')
+    } finally {
+      setNotificationBusy(false)
     }
+  }
 
-    const togglePush = async () => {
-      setPushBusy(true)
-      try {
-        if (pushState.subscribed) {
-          await disablePushNotifications()
-          setPushState(current => ({ ...current, subscribed: false }))
-          setSaved('Browser push notifications disabled.')
-        } else {
-          await enablePushNotifications()
-          setPushState(current => ({ ...current, subscribed: true, permission: 'granted' }))
-          setSaved('Browser push notifications enabled.')
-        }
-        setError('')
-      } catch (err) {
-        setError(err.message || 'Push notification settings could not be updated.')
-      } finally {
-        setPushBusy(false)
+  const togglePush = async () => {
+    setPushBusy(true)
+    try {
+      if (pushState.subscribed) {
+        await disablePushNotifications()
+        setPushState(current => ({ ...current, subscribed: false }))
+        setSaved('Browser push notifications disabled.')
+      } else {
+        await enablePushNotifications()
+        setPushState(current => ({ ...current, subscribed: true, permission: 'granted' }))
+        setSaved('Browser push notifications enabled.')
       }
+      setError('')
+    } catch (err) {
+      setError(err.message || 'Push notification settings could not be updated.')
+      setSaved('')
+    } finally {
+      setPushBusy(false)
     }
   }
 
@@ -122,6 +128,9 @@ export default function SettingsPage() {
           <SettingLink to="/premium" icon={<Sparkles size={18} />} title="LinkUp Premium" description="View your plan and available benefits" />
           <SettingLink to="/safety" icon={<Shield size={18} />} title="Safety center" description="Manage reports and blocked profiles" />
           <SettingLink to="/forgot-password" icon={<LockKeyhole size={18} />} title="Password help" description="Request a password reset email" />
+          <button type="button" onClick={signOut} style={{ ...logoutStyle, marginTop: '12px' }}>
+            <LogOut size={18} /> Log out
+          </button>
         </section>
 
         <section style={cardStyle}>
@@ -181,28 +190,33 @@ export default function SettingsPage() {
         <section style={cardStyle}>
           <h2 style={titleStyle}>Notifications</h2>
           <SettingRow icon={<Bell size={18} />} title="Messages" description="New message notifications">
-            <input type="checkbox" checked={notifications.messages} onChange={event => saveNotifications('messages', event.target.checked)} aria-label="Message notifications" style={switchStyle} />
+            <input type="checkbox" checked={notifications.messages} onChange={event => saveNotifications('messages', event.target.checked)} aria-label="Message notifications" disabled={notificationBusy} style={switchStyle} />
           </SettingRow>
           <SettingRow icon={<Bell size={18} />} title="Likes and matches" description="When someone likes your profile">
-            <input type="checkbox" checked={notifications.likes} onChange={event => saveNotifications('likes', event.target.checked)} aria-label="Like notifications" style={switchStyle} />
+            <input type="checkbox" checked={notifications.likes} onChange={event => saveNotifications('likes', event.target.checked)} aria-label="Like notifications" disabled={notificationBusy} style={switchStyle} />
           </SettingRow>
           <SettingRow icon={<Bell size={18} />} title="Post activity" description="Comments and reactions">
-            <input type="checkbox" checked={notifications.posts} onChange={event => saveNotifications('posts', event.target.checked)} aria-label="Post activity notifications" style={switchStyle} />
+            <input type="checkbox" checked={notifications.posts} onChange={event => saveNotifications('posts', event.target.checked)} aria-label="Post activity notifications" disabled={notificationBusy} style={switchStyle} />
           </SettingRow>
-          <SettingRow icon={<Bell size={18} />} title="Browser push" description={pushState.supported ? 'Get alerts when LinkUp is closed' : 'Push is not supported in this browser'}>
-            <button type="button" disabled={!pushState.supported || pushBusy} onClick={togglePush} style={pushButtonStyle}>
-              {pushBusy ? '…' : pushState.subscribed ? 'Disable' : 'Enable'}
+          <SettingRow icon={<Bell size={18} />} title="Browser push" description={
+            !pushState.supported
+              ? 'Push is not supported in this browser'
+              : pushState.permission === 'denied'
+                ? 'Allow notifications in your browser settings to enable push'
+                : 'Get alerts when LinkUp is closed'
+          }>
+            <button type="button" disabled={!pushState.supported || pushBusy} aria-busy={pushBusy} onClick={togglePush} style={pushButtonStyle}>
+              {pushBusy ? 'Working…' : pushState.subscribed ? 'Disable' : 'Enable'}
             </button>
           </SettingRow>
           <SettingRow icon={<Bell size={18} />} title="Push preference" description="Allow activity notifications to reach this browser">
-            <input type="checkbox" checked={notifications.push_enabled ?? true} onChange={event => saveNotifications('push_enabled', event.target.checked)} aria-label="Push notification preference" style={switchStyle} />
+            <input type="checkbox" checked={notifications.push_enabled ?? true} onChange={event => saveNotifications('push_enabled', event.target.checked)} aria-label="Push notification preference" disabled={notificationBusy} style={switchStyle} />
           </SettingRow>
           <p style={helperStyle}>Push delivery also requires the browser permission and server-side VAPID configuration.</p>
         </section>
 
-        {error && <p role="alert" style={errorStyle}>{error}</p>}
-        {saved && <p role="status" style={successStyle}>{saved}</p>}
-        <button type="button" onClick={signOut} style={logoutStyle}><LogOut size={18} /> Log out</button>
+        {error && <p role="alert" aria-live="assertive" style={errorStyle}>{error}</p>}
+        {saved && <p role="status" aria-live="polite" style={successStyle}>{saved}</p>}
         <p style={{ ...helperStyle, textAlign: 'center', margin: '18px 10px' }}>Account deletion and password changes are not currently available in settings.</p>
       </div>
     </>

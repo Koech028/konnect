@@ -1,7 +1,8 @@
 from rest_framework import serializers
+from django.db.models import Q
 
 from apps.accounts.serializers import UserSerializer
-from apps.safety.models import Block, Report
+from apps.safety.models import Block, ContentReport, Report
 
 
 class BlockSerializer(serializers.ModelSerializer):
@@ -60,3 +61,62 @@ class ReportSerializer(serializers.ModelSerializer):
             reported_user=target,
             **validated_data,
         )
+
+
+class ContentReportSerializer(serializers.ModelSerializer):
+    short_id = serializers.UUIDField(source='short.id', read_only=True)
+    comment_id = serializers.UUIDField(source='comment.id', read_only=True)
+    short = serializers.UUIDField(write_only=True, required=False)
+    comment = serializers.UUIDField(write_only=True, required=False)
+
+    class Meta:
+        model = ContentReport
+        fields = (
+            'id', 'short_id', 'comment_id', 'short', 'comment',
+            'reason', 'details', 'status', 'created_at',
+        )
+        read_only_fields = ('id', 'short_id', 'comment_id', 'status', 'created_at')
+        extra_kwargs = {
+            'details': {'required': False, 'allow_blank': True},
+        }
+
+    def validate(self, attrs):
+        from apps.community.models import Short, ShortComment
+
+        has_short = 'short' in attrs
+        has_comment = 'comment' in attrs
+        if has_short == has_comment:
+            raise serializers.ValidationError('Report either a Short or a comment.')
+
+        target_model = Short if has_short else ShortComment
+        target_id = attrs.pop('short' if has_short else 'comment')
+        target = target_model.objects.filter(pk=target_id).first()
+        if target is None:
+            raise serializers.ValidationError('This content is no longer available.')
+        short = target if has_short else target.short
+        request = self.context['request']
+        if not short.author.is_active or short.author.profile_status != 'active':
+            raise serializers.ValidationError('This content is no longer available.')
+        if Block.objects.filter(
+            Q(blocker=request.user, blocked=short.author)
+            | Q(blocker=short.author, blocked=request.user)
+        ).exists():
+            raise serializers.ValidationError('This content is no longer available.')
+        content_author = target.author if has_comment else short.author
+        if content_author.id == request.user.id:
+            raise serializers.ValidationError('You cannot report your own content.')
+        if not has_short:
+            attrs['comment'] = target
+        else:
+            attrs['short'] = target
+        target_field = 'short' if has_short else 'comment'
+        if ContentReport.objects.filter(
+            reporter=request.user,
+            **{target_field: target},
+        ).exists():
+            raise serializers.ValidationError('You have already reported this content.')
+        return attrs
+
+    def create(self, validated_data):
+        validated_data['reporter'] = self.context['request'].user
+        return ContentReport.objects.create(**validated_data)

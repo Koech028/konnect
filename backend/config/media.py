@@ -3,8 +3,8 @@ import uuid
 
 import boto3
 from botocore.config import Config
-from rest_framework import status
-from rest_framework.exceptions import APIException, ValidationError
+from rest_framework import status, throttling
+from rest_framework.exceptions import APIException, PermissionDenied, ValidationError
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -16,6 +16,9 @@ class MediaStorageUnavailable(APIException):
 
 
 class MediaUploadUrlView(APIView):
+    throttle_classes = (throttling.ScopedRateThrottle,)
+    throttle_scope = 'media-upload'
+
     allowed_types = {
         'image/jpeg': ('jpg', 5 * 1024 * 1024),
         'image/png': ('png', 5 * 1024 * 1024),
@@ -26,13 +29,15 @@ class MediaUploadUrlView(APIView):
     }
 
     def post(self, request):
+        if not request.user.is_active or request.user.profile_status != 'active':
+            raise PermissionDenied('Your account must be active to upload media.')
         content_type = request.data.get('content_type', '')
         if isinstance(content_type, str):
             content_type = content_type.split(';', 1)[0].strip().lower()
         try:
             size = int(request.data.get('size', 0))
         except (TypeError, ValueError) as exc:
-            raise ValidationError({'size': 'Provide the image size in bytes.'}) from exc
+            raise ValidationError({'size': 'Provide the media size in bytes.'}) from exc
         if content_type not in self.allowed_types:
             raise ValidationError({
                 'content_type': 'Upload a JPEG, PNG, WebP, MP4, WebM, or QuickTime video.'

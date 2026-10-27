@@ -15,21 +15,38 @@ export default function DiscoverPage() {
     gender: 'Everyone',
     ageMin: 18,
     ageMax: 40,
-    verifiedOnly: false
+    verifiedOnly: false,
+    sharedInterestsOnly: false
   })
 
   useEffect(() => {
+    let active = true
     const query = {
       q: searchQuery,
       gender: filters.gender === 'Everyone' ? '' : filters.gender,
       age_min: filters.ageMin,
       age_max: filters.ageMax,
-      verified: filters.verifiedOnly ? 'true' : ''
+      verified: filters.verifiedOnly ? 'true' : '',
+      shared_interests: filters.sharedInterestsOnly ? 'true' : ''
     }
-    searchProfiles(query)
-      .then(setProfiles)
-      .catch(err => setError(err.message || 'Profiles could not be loaded.'))
-      .finally(() => setIsLoading(false))
+    setIsLoading(true)
+    setError('')
+    const timeout = window.setTimeout(() => {
+      searchProfiles(query)
+        .then(result => {
+          if (active) setProfiles(result)
+        })
+        .catch(err => {
+          if (active) setError(err.message || 'Profiles could not be loaded.')
+        })
+        .finally(() => {
+          if (active) setIsLoading(false)
+        })
+    }, 250)
+    return () => {
+      active = false
+      window.clearTimeout(timeout)
+    }
   }, [searchQuery, filters, searchProfiles])
 
   return (
@@ -72,6 +89,8 @@ export default function DiscoverPage() {
           />
         </div>
         <button
+          type="button"
+          aria-label="Open discovery filters"
           onClick={() => setShowFilters(true)}
           style={{
             width: '44px',

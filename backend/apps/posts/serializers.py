@@ -1,4 +1,5 @@
 from rest_framework import serializers
+from urllib.parse import urlparse
 
 from apps.accounts.serializers import UserSerializer
 from apps.posts.models import Comment, PollOption, Post, PostMedia, PollVote
@@ -149,4 +150,19 @@ class PostWriteSerializer(serializers.Serializer):
             raise serializers.ValidationError({'content': {'poll_options': 'Poll options are only valid for poll posts.'}})
         if len(attrs['poll_options']) != len(set(attrs['poll_options'])):
             raise serializers.ValidationError({'content': {'poll_options': 'Poll options must be unique.'}})
+        if attrs['type'] == Post.Type.VIDEO:
+            if len(attrs['media_urls']) != 1:
+                raise serializers.ValidationError({
+                    'content': {'media': 'A video post must contain exactly one uploaded video.'}
+                })
+            video_url = attrs['media_urls'][0]
+            parsed_url = urlparse(video_url)
+            if parsed_url.scheme != 'https' or not parsed_url.path.lower().endswith(('.mp4', '.webm', '.mov')):
+                raise serializers.ValidationError({
+                    'content': {'media': 'Upload an MP4, WebM, or QuickTime video over HTTPS.'}
+                })
+        if any(urlparse(url).scheme != 'https' for url in attrs['media_urls']):
+            raise serializers.ValidationError({
+                'content': {'media': 'Media URLs must use HTTPS.'}
+            })
         return attrs

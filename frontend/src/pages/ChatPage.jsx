@@ -110,6 +110,7 @@ export default function ChatPage() {
       match={match}
       messages={messages}
       currentUserId={user?.id}
+      currentUserInterests={user?.interests || []}
       otherUserTyping={otherUserTyping}
       onTyping={handleTyping}
       onSendMessage={handleSendMessage}

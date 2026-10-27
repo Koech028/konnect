@@ -16,6 +16,7 @@ class ProfileApiTests(APITestCase):
             age=28,
             gender='woman',
             city='Nairobi',
+            interests=['coffee', 'hiking'],
             country='Kenya',
         )
         self.other = User.objects.create_user(
@@ -50,6 +51,25 @@ class ProfileApiTests(APITestCase):
         response = self.client.get('/api/v1/discover/?q=coffee&gender=men&age_min=30&age_max=35')
         self.assertEqual(response.status_code, 200)
         self.assertEqual([profile['id'] for profile in response.data], [str(self.other.id)])
+
+    def test_discover_reports_shared_interests_and_supports_shared_only_filter(self):
+        unrelated = User.objects.create_user(
+            email='unrelated@example.com',
+            password='Mango!Sunrise_2026',
+            display_name='Unrelated',
+            age=30,
+            gender='other',
+            interests=['gardening'],
+        )
+        response = self.client.get('/api/v1/discover/')
+        profiles = {profile['id']: profile for profile in response.data}
+
+        self.assertEqual(profiles[str(self.other.id)]['shared_interests'], ['coffee'])
+        self.assertTrue(profiles[str(self.other.id)]['same_city'])
+        self.assertEqual(profiles[str(unrelated.id)]['shared_interests'], [])
+
+        filtered = self.client.get('/api/v1/discover/?shared_interests=true')
+        self.assertEqual([profile['id'] for profile in filtered.data], [str(self.other.id)])
 
     def test_profile_photos_are_owned_and_limited(self):
         created = self.client.post('/api/v1/profiles/me/photos/', {

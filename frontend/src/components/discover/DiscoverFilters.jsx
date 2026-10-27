@@ -145,6 +145,29 @@ export default function DiscoverFilters({ filters, onChange, onClose }) {
               </span>
             </label>
           </div>
+
+          <div style={{ marginBottom: 'var(--space-xl)' }}>
+            <label style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '12px',
+              cursor: 'pointer'
+            }}>
+              <input
+                type="checkbox"
+                checked={!!localFilters.sharedInterestsOnly}
+                onChange={(e) => setLocalFilters(prev => ({ ...prev, sharedInterestsOnly: e.target.checked }))}
+                style={{ width: '20px', height: '20px', accentColor: 'var(--color-primary)' }}
+              />
+              <span style={{
+                fontSize: '14px',
+                fontWeight: 500,
+                color: 'var(--color-text-primary)'
+              }}>
+                Only show people who share my interests
+              </span>
+            </label>
+          </div>
         </div>
 
         <div style={{

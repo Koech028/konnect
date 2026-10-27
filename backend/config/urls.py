@@ -15,7 +15,7 @@ from apps.notifications.views import (
 )
 from apps.posts.views import PostViewSet, CommentViewSet, PollVoteView
 from apps.profiles.views import ProfileViewSet, ProfilePhotoViewSet, VerificationRequestView
-from apps.safety.views import BlockViewSet, ReportViewSet
+from apps.safety.views import BlockViewSet, ContentReportViewSet, ReportViewSet
 from apps.livestreams.views import (
     GiftView,
     LiveStreamDetailView,
@@ -96,6 +96,7 @@ urlpatterns = [
     path('api/v1/safety/blocks/', BlockViewSet.as_view({'get': 'list', 'post': 'create'}), name='blocks'),
     path('api/v1/safety/blocks/<uuid:pk>/', BlockViewSet.as_view({'delete': 'destroy'}), name='block-detail'),
     path('api/v1/safety/reports/', ReportViewSet.as_view({'get': 'list', 'post': 'create'}), name='reports'),
+    path('api/v1/safety/content-reports/', ContentReportViewSet.as_view({'get': 'list', 'post': 'create'}), name='content-reports'),
     path('api/v1/live/', LiveStreamListCreateView.as_view(), name='live-list-create'),
     path('api/v1/live/wallet/', WalletView.as_view(), name='live-wallet'),
     path('api/v1/live/<uuid:pk>/', LiveStreamDetailView.as_view(), name='live-detail'),
