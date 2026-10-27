@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Heart, MessageCircle, Plus, Send, Trash2, X } from 'lucide-react'
 import Avatar from '../components/common/Avatar'
+import ReportContentButton from '../components/feed/ReportContentButton'
 import { useAuth } from '../context/AuthContext'
 import { api } from '../utils/api'
 import { getVideoDuration, uploadVideo } from '../utils/uploadImage'
@@ -191,6 +192,7 @@ export default function ShortsPage() {
                     <Trash2 size={18} /> Delete
                   </button>
                 )}
+                {short.author_id !== user?.id && <ReportContentButton shortId={short.id} />}
               </div>
               {activeComments === short.id && (
                 <section aria-label="Short comments" style={commentsPanelStyle}>
@@ -200,7 +202,10 @@ export default function ShortsPage() {
                   </div>
                   <div style={commentListStyle}>
                     {comments.map(comment => (
-                      <p key={comment.id} style={commentStyle}><strong>{comment.author_name}</strong> {comment.text}</p>
+                      <div key={comment.id} style={commentRowStyle}>
+                        <p style={commentStyle}><strong>{comment.author_name}</strong> {comment.text}</p>
+                        {comment.author_id !== user?.id && <ReportContentButton commentId={comment.id} />}
+                      </div>
                     ))}
                     {!comments.length && <p style={counterStyle}>Be the first to say something kind.</p>}
                   </div>
@@ -243,5 +248,6 @@ const commentsHeaderStyle = { display: 'flex', justifyContent: 'space-between', 
 const closeButtonStyle = { display: 'grid', placeItems: 'center', width: 30, height: 30, border: 0, borderRadius: '50%', background: 'transparent', color: 'var(--color-text-primary)', cursor: 'pointer' }
 const commentListStyle = { display: 'grid', gap: 6, maxHeight: 180, overflowY: 'auto', padding: '8px 0' }
 const commentStyle = { margin: 0, fontSize: 13, overflowWrap: 'anywhere' }
+const commentRowStyle = { display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }
 const commentFormStyle = { display: 'flex', alignItems: 'center', gap: 8 }
 const sendButtonStyle = { display: 'grid', placeItems: 'center', flex: '0 0 38px', height: 38, border: 0, borderRadius: '50%', background: 'var(--color-primary)', color: '#fff', cursor: 'pointer' }

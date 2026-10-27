@@ -7,7 +7,12 @@ from rest_framework.views import APIView
 from apps.accounts.models import User
 from apps.accounts.serializers import CurrentUserSerializer, UserSerializer
 from apps.profiles.models import ProfilePhoto, VerificationRequest
-from apps.profiles.serializers import ProfilePhotoSerializer, ProfileUpdateSerializer, VerificationRequestSerializer
+from apps.profiles.serializers import (
+    DiscoveryProfileSerializer,
+    ProfilePhotoSerializer,
+    ProfileUpdateSerializer,
+    VerificationRequestSerializer,
+)
 from apps.safety.models import Block
 
 
@@ -55,6 +60,7 @@ class ProfileViewSet(viewsets.GenericViewSet):
         preferences = request.user.preferences or {}
         age_min = request.query_params.get('age_min', preferences.get('age_min'))
         age_max = request.query_params.get('age_max', preferences.get('age_max'))
+        shared_interests_only = request.query_params.get('shared_interests') == 'true'
 
         if query:
             queryset = queryset.filter(
@@ -82,7 +88,41 @@ class ProfileViewSet(viewsets.GenericViewSet):
             queryset = queryset.filter(age__gte=self._parse_age(age_min))
         if age_max:
             queryset = queryset.filter(age__lte=self._parse_age(age_max))
-        return Response(UserSerializer(queryset, many=True, context={'request': request}).data)
+        viewer_interests = {
+            item.strip().casefold()
+            for item in (request.user.interests or [])
+            if isinstance(item, str) and item.strip()
+        }
+        viewer_city = (request.user.city or '').strip().casefold()
+        profiles = list(queryset.prefetch_related('profile_photos'))
+        if shared_interests_only:
+            profiles = [
+                profile for profile in profiles
+                if any(
+                    isinstance(item, str) and item.strip().casefold() in viewer_interests
+                    for item in (profile.interests or [])
+                )
+            ]
+        profiles.sort(
+            key=lambda profile: (
+                sum(
+                    1                     for item in (profile.interests or [])
+                    if isinstance(item, str) and item.strip().casefold() in viewer_interests
+                ),
+                bool(viewer_city and (profile.city or '').strip().casefold() == viewer_city),
+                profile.last_active,
+            ),
+            reverse=True,
+        )
+        return Response(DiscoveryProfileSerializer(
+            profiles,
+            many=True,
+            context={
+                'request': request,
+                'viewer_interests': viewer_interests,
+                'viewer_city': viewer_city,
+            },
+        ).data)
 
     @staticmethod
     def _parse_age(value):

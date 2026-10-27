@@ -41,7 +41,11 @@ The development email backend writes password-reset messages to the server conso
 
 PostgreSQL is the right fit for the app's relational user, profile, post, like, match, and message data. Supabase PostgreSQL can host the database. Put its PostgreSQL connection string in `DATABASE_URL`; local development uses SQLite when `DEBUG=true` and no URL is set. Django currently handles passwords and JWT authentication; setting Supabase Auth keys alone does not change that. The React app still contains demo/local-storage data flows, so those must be connected to the API before this is a complete production application.
 
-Cloudflare R2 credentials are server-only configuration. Authenticated users can request short-lived upload URLs from `POST /api/v1/media/upload-url/` for JPEG, PNG, or WebP images up to 5 MB. The browser uploads directly to R2, then the image URL is saved with the profile or post. Configure a public HTTPS custom domain for the bucket and R2 CORS to allow browser `PUT` requests from the frontend origin. The endpoint enforces supported content type and size, and scopes object keys to the requesting user.
+Cloudflare R2 credentials are server-only configuration. Authenticated active users request short-lived, content-type/size-bound upload URLs from `POST /api/v1/media/upload-url/`. The browser uploads media bytes directly to R2 with `PUT`; Django does not proxy or persist file bytes. Images support JPEG, PNG, or WebP up to 5 MB. Videos support MP4, WebM, or QuickTime up to 50 MB. The returned HTTPS URL is then saved in the API for a profile photo, photo/event post, video post, story, or Short. Short/story/post videos are limited to 60 seconds by the frontend duration check, and the API validates the declared duration where applicable. Actual file contents/duration are not inspected or transcoded on the server.
+
+For local or production uploads, set `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_R2_ACCESS_KEY_ID`, `CLOUDFLARE_R2_SECRET_ACCESS_KEY`, `CLOUDFLARE_R2_BUCKET`, and `CLOUDFLARE_R2_PUBLIC_URL` in the backend environment. The public URL must be HTTPS. Configure the bucket CORS policy to allow `PUT` from each exact frontend origin (for example `http://localhost:3000` and the deployed `https://...` origin), allow the `Content-Type` request header, and expose `ETag` if the client needs it. Keep the R2 access keys only on the backend. If these settings are absent, upload URL requests return HTTP 503; they are not silently stored on the application server.
+
+Live camera and microphone capture happen in the browser via LiveKit WebRTC; Django issues join tokens but does not receive camera files or media streams. Hosts need a configured LiveKit Cloud/server URL and API credentials in `LIVEKIT_URL`, `LIVEKIT_API_KEY`, and `LIVEKIT_API_SECRET`, with the secret kept backend-only. The browser must be on HTTPS or localhost and the host must grant camera/microphone permissions. The room controls allow the host to enable/disable each device. Without LiveKit credentials, start/join returns HTTP 503; without browser permission or a secure origin, the room can connect without host media and displays the relevant error.
 
 ## Deploying with Render
 
@@ -97,7 +101,7 @@ The React app currently has the password-request screen only. Add a `/reset-pass
 | GET | `/api/v1/profiles/me/` | Read the current profile |
 | PATCH | `/api/v1/profiles/me/` | Edit profile fields, location, interests, preferences, or visibility |
 | GET | `/api/v1/profiles/{user_id}/` | Read an active public profile |
-| GET | `/api/v1/discover/?q=&gender=&age_min=&age_max=&verified=` | Search/filter active profiles |
+| GET | `/api/v1/discover/?q=&gender=&age_min=&age_max=&verified=&shared_interests=` | Search/filter active profiles; includes shared interest and same-city signals |
 | GET, POST | `/api/v1/profiles/me/photos/` | List or add photo URL records (maximum 6) |
 | PATCH, DELETE | `/api/v1/profiles/me/photos/{photo_id}/` | Update or remove an owned photo |
 | POST | `/api/v1/media/upload-url/` | Request a short-lived authenticated R2 image or video upload URL |
@@ -135,12 +139,19 @@ The React app currently has the password-request screen only. Add a `/reset-pass
 | GET, POST | `/api/v1/safety/blocks/` | List or block profiles (`user_id`) |
 | DELETE | `/api/v1/safety/blocks/{block_id}/` | Unblock a profile |
 | GET, POST | `/api/v1/safety/reports/` | List or submit a report |
+| GET, POST | `/api/v1/safety/content-reports/` | List your reports or report a Short/comment for staff review |
 | GET, POST | `/api/v1/live/` | List live streams or start one |
 | GET | `/api/v1/live/wallet/` | Read virtual credit balance and gift catalog |
 | GET | `/api/v1/live/{stream_id}/` | Read a live stream |
 | POST | `/api/v1/live/{stream_id}/join/` | Get a short-lived LiveKit room token |
 | POST | `/api/v1/live/{stream_id}/end/` | End a stream (host only) |
 | POST | `/api/v1/live/{stream_id}/gifts/` | Send a virtual gift using credits |
+
+## Discovery and conversations
+
+Discovery responses include `shared_interests` and `same_city` signals. The optional `shared_interests=true` query limits results to profiles sharing at least one interest. Results prioritize shared interests, then same-city profiles and recent activity. This is not a distance or compatibility guarantee; the app does not currently store precise coordinates.
+
+New match conversations show optional icebreaker suggestions based on shared interests, or general first-message ideas when none overlap. A suggestion only fills the draft; users choose whether to edit and send it.
 
 ## Live video and virtual gifts
 
@@ -150,7 +161,9 @@ New wallets start with 100 virtual credits. Roses cost 10 credits, hearts 25, an
 
 ## Stories, events, verification, and premium
 
-Stories can contain text, an image, or a short video and expire after 24 hours. Shorts are videos up to 60 seconds in the client, with likes, comments, and deduplicated signed-in views. Both use the signed R2 upload flow; images are capped at 5 MB, and MP4, WebM, and QuickTime uploads at 50 MB. Video duration is checked in the browser and the declared duration is validated by the API; upload processing/transcoding and server-side media inspection are not included. Blocking an author hides their stories and Shorts and prevents interactions.
+Stories can contain text, an image, or a short video and expire after 24 hours. Shorts are videos up to 60 seconds in the client, with likes, comments, and deduplicated signed-in views. Both use the signed R2 upload flow; images are capped at 5 MB, and MP4, WebM, and QuickTime uploads at 50 MB. Upload URL requests are throttled and require an active account. Video duration is checked in the browser and the declared duration is validated by the API; upload processing/transcoding and server-side media inspection are not included. Blocking an author hides their stories and Shorts and prevents interactions.
+
+Shorts and their comments can be reported from the feed. A user can submit one report per item; reports are private to the reporter and are available to staff in Django Admin for review.
 
 The daily conversation prompt changes each day. Answers are private to the account and can be edited during that day; participation is optional. Events are visible to signed-in users, use a public venue description, and support capacity-limited RSVPs. Blocking a host hides their events and prevents event access.
 

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { ArrowLeft, Radio, VideoOff } from 'lucide-react'
+import { ArrowLeft, Camera, CameraOff, Mic, MicOff, Radio, VideoOff } from 'lucide-react'
 import { Room, RoomEvent, Track } from 'livekit-client'
 import { api } from '../utils/api'
 import { useAuth } from '../context/AuthContext'
@@ -40,7 +40,7 @@ export default function LiveRoomPage() {
   const [stream, setStream] = useState(null)
   const [credentials, setCredentials] = useState(null)
   const [room, setRoom] = useState(null)
-  const [refreshCount, setRefreshCount] = useState(0)
+  const [, setRefreshCount] = useState(0)
   const [balance, setBalance] = useState(0)
   const [giftCatalog, setGiftCatalog] = useState([])
   const [giftEvents, setGiftEvents] = useState([])
@@ -49,6 +49,10 @@ export default function LiveRoomPage() {
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
   const [isConnected, setIsConnected] = useState(false)
+  const [cameraEnabled, setCameraEnabled] = useState(false)
+  const [microphoneEnabled, setMicrophoneEnabled] = useState(false)
+  const [cameraBusy, setCameraBusy] = useState(false)
+  const [microphoneBusy, setMicrophoneBusy] = useState(false)
   const roomRef = useRef(null)
 
   useEffect(() => {
@@ -100,6 +104,10 @@ export default function LiveRoomPage() {
 
     liveRoom.on(RoomEvent.TrackSubscribed, refreshParticipants)
     liveRoom.on(RoomEvent.TrackUnsubscribed, refreshParticipants)
+    liveRoom.on(RoomEvent.TrackPublished, refreshParticipants)
+    liveRoom.on(RoomEvent.TrackUnpublished, refreshParticipants)
+    liveRoom.on(RoomEvent.LocalTrackPublished, refreshParticipants)
+    liveRoom.on(RoomEvent.LocalTrackUnpublished, refreshParticipants)
     liveRoom.on(RoomEvent.ParticipantConnected, refreshParticipants)
     liveRoom.on(RoomEvent.ParticipantDisconnected, refreshParticipants)
     liveRoom.on(RoomEvent.DataReceived, handleData)
@@ -112,13 +120,32 @@ export default function LiveRoomPage() {
           await liveRoom.disconnect()
           return
         }
-        if (stream.host_id === user?.id) {
-          await liveRoom.localParticipant.enableCameraAndMicrophone()
-        }
         if (!cancelled) {
           setRoom(liveRoom)
           setIsConnected(true)
           refreshParticipants()
+        }
+        if (stream.host_id === user?.id) {
+          if (!window.isSecureContext) {
+            setError('Camera and microphone require HTTPS, or localhost during development.')
+            return
+          }
+          const permissionErrors = []
+          try {
+            await liveRoom.localParticipant.setCameraEnabled(true)
+            if (!cancelled) setCameraEnabled(true)
+          } catch (err) {
+            permissionErrors.push(`Camera: ${err.message || 'permission was not granted'}`)
+          }
+          try {
+            await liveRoom.localParticipant.setMicrophoneEnabled(true)
+            if (!cancelled) setMicrophoneEnabled(true)
+          } catch (err) {
+            permissionErrors.push(`Microphone: ${err.message || 'permission was not granted'}`)
+          }
+          if (!cancelled && permissionErrors.length) {
+            setError(`${permissionErrors.join('. ')}. Check browser permissions and use the controls below to retry.`)
+          }
         }
       } catch (err) {
         if (!cancelled) setError(err.message || 'Could not connect to the live video room.')
@@ -132,12 +159,42 @@ export default function LiveRoomPage() {
       roomRef.current = null
       setRoom(null)
       setIsConnected(false)
+      setCameraEnabled(false)
+      setMicrophoneEnabled(false)
     }
   }, [credentials, navigate, stream, user?.id])
 
   const isHost = stream?.host_id === user?.id
   const remoteParticipants = room ? Array.from(room.remoteParticipants.values()) : []
   const localParticipant = room?.localParticipant
+
+  const toggleCamera = async () => {
+    if (!roomRef.current || !isConnected || cameraBusy) return
+    setCameraBusy(true)
+    setError('')
+    try {
+      await roomRef.current.localParticipant.setCameraEnabled(!cameraEnabled)
+      setCameraEnabled(value => !value)
+    } catch (err) {
+      setError(`Camera could not be ${cameraEnabled ? 'turned off' : 'enabled'}: ${err.message || 'check browser camera permissions.'}`)
+    } finally {
+      setCameraBusy(false)
+    }
+  }
+
+  const toggleMicrophone = async () => {
+    if (!roomRef.current || !isConnected || microphoneBusy) return
+    setMicrophoneBusy(true)
+    setError('')
+    try {
+      await roomRef.current.localParticipant.setMicrophoneEnabled(!microphoneEnabled)
+      setMicrophoneEnabled(value => !value)
+    } catch (err) {
+      setError(`Microphone could not be ${microphoneEnabled ? 'muted' : 'enabled'}: ${err.message || 'check browser microphone permissions.'}`)
+    } finally {
+      setMicrophoneBusy(false)
+    }
+  }
 
   const sendGift = async gift => {
     if (!roomRef.current || sendingGift) return
@@ -215,7 +272,20 @@ export default function LiveRoomPage() {
 
       <section style={controlsStyle}>
         {isHost
-          ? <button type="button" onClick={endStream} style={endButtonStyle}>End live stream</button>
+          ? <>
+            <div style={deviceControlsStyle}>
+              <button type="button" onClick={toggleCamera} disabled={!isConnected || cameraBusy} aria-pressed={cameraEnabled} style={deviceButtonStyle}>
+                {cameraEnabled ? <Camera size={18} /> : <CameraOff size={18} />}
+                {cameraBusy ? 'Updating camera…' : cameraEnabled ? 'Turn camera off' : 'Turn camera on'}
+              </button>
+              <button type="button" onClick={toggleMicrophone} disabled={!isConnected || microphoneBusy} aria-pressed={microphoneEnabled} style={deviceButtonStyle}>
+                {microphoneEnabled ? <Mic size={18} /> : <MicOff size={18} />}
+                {microphoneBusy ? 'Updating microphone…' : microphoneEnabled ? 'Mute microphone' : 'Enable microphone'}
+              </button>
+            </div>
+            <p style={deviceHelpStyle}>Allow camera and microphone access in your browser. Live video requires HTTPS or localhost.</p>
+            <button type="button" onClick={endStream} style={endButtonStyle}>End live stream</button>
+          </>
           : <>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
               <strong style={{ fontSize: 14 }}>Send a gift</strong>
@@ -252,6 +322,9 @@ const participantNameStyle = { position: 'absolute', left: 10, bottom: 8, paddin
 const stageStyle = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 10, minHeight: 260, padding: 8, borderRadius: 'var(--radius-lg)', background: '#111' }
 const connectingStyle = { gridColumn: '1 / -1', alignSelf: 'center', textAlign: 'center', color: '#fff', padding: 16 }
 const controlsStyle = { marginTop: 14, padding: 14, borderRadius: 'var(--radius-lg)', background: 'var(--color-surface)', boxShadow: 'var(--shadow-sm)' }
+const deviceControlsStyle = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 8, marginBottom: 8 }
+const deviceButtonStyle = { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, padding: 11, border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', background: 'var(--color-bg)', color: 'var(--color-text-primary)', font: 'inherit', fontSize: 13, fontWeight: 600, cursor: 'pointer' }
+const deviceHelpStyle = { margin: '4px 0 12px', color: 'var(--color-text-secondary)', fontSize: 12 }
 const backButtonStyle = { display: 'grid', placeItems: 'center', width: 38, height: 38, border: '1px solid var(--color-border)', borderRadius: '50%', background: 'var(--color-surface)', color: 'var(--color-text-primary)', cursor: 'pointer' }
 const liveBadgeStyle = { display: 'flex', alignItems: 'center', gap: 5, color: 'var(--color-primary-dark)', background: 'var(--color-primary-soft)', borderRadius: 20, padding: '5px 9px', fontSize: 11, fontWeight: 800 }
 const errorStyle = { color: 'var(--color-error)', padding: '8px 0', fontSize: 13 }

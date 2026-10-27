@@ -224,17 +224,33 @@ export default function FeedPost({ post, onLike, onShare, onInterest, onPollVote
             borderRadius: 'var(--radius-md)',
             overflow: 'hidden'
           }}>
-            <img
-              src={post.content.media[0]}
-              alt="Post media"
-              style={{
-                width: '100%',
-                maxHeight: '400px',
-                objectFit: 'cover',
-                display: 'block'
-              }}
-              loading="lazy"
-            />
+            {post.type === 'video' ? (
+              <video
+                src={post.content.media[0]}
+                controls
+                playsInline
+                preload="metadata"
+                aria-label="Post video"
+                style={{
+                  width: '100%',
+                  maxHeight: '500px',
+                  display: 'block',
+                  background: '#111'
+                }}
+              />
+            ) : (
+              <img
+                src={post.content.media[0]}
+                alt="Post media"
+                style={{
+                  width: '100%',
+                  maxHeight: '400px',
+                  objectFit: 'cover',
+                  display: 'block'
+                }}
+                loading="lazy"
+              />
+            )}
           </div>
         )}
 

@@ -8,6 +8,7 @@ class Post(models.Model):
     class Type(models.TextChoices):
         STATUS = 'status', 'Status'
         PHOTO = 'photo', 'Photo'
+        VIDEO = 'video', 'Video'
         POLL = 'poll', 'Poll'
         EVENT = 'event', 'Event'
 

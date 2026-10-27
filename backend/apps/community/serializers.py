@@ -106,13 +106,14 @@ class CreateShortSerializer(serializers.ModelSerializer):
 
 
 class ShortCommentSerializer(serializers.ModelSerializer):
+    author_id = serializers.UUIDField(source='author.id', read_only=True)
     author_name = serializers.CharField(source='author.display_name', read_only=True)
     author_avatar = serializers.CharField(source='author.avatar_url', read_only=True)
 
     class Meta:
         model = ShortComment
-        fields = ('id', 'author_name', 'author_avatar', 'text', 'created_at')
-        read_only_fields = ('id', 'author_name', 'author_avatar', 'created_at')
+        fields = ('id', 'author_id', 'author_name', 'author_avatar', 'text', 'created_at')
+        read_only_fields = ('id', 'author_id', 'author_name', 'author_avatar', 'created_at')
 
 
 class DailyPromptResponseSerializer(serializers.ModelSerializer):

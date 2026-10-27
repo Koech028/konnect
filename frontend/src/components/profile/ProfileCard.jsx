@@ -169,7 +169,17 @@ export default function ProfileCard({ user, onLike, liked }) {
             )}
           </div>
         )}
+        {user.shared_interests?.length > 0 && (
+          <p style={sharedInterestsStyle}>
+            You both like {user.shared_interests.slice(0, 3).join(', ')}
+            {user.shared_interests.length > 3 ? ` +${user.shared_interests.length - 3}` : ''}
+          </p>
+        )}
+        {user.same_city && <span style={sameCityStyle}>In your city</span>}
       </div>
     </div>
   )
 }
+
+const sharedInterestsStyle = { margin: '10px 0 0', color: 'var(--color-primary-dark)', fontSize: 12, fontWeight: 600 }
+const sameCityStyle = { display: 'inline-block', marginTop: 7, padding: '4px 8px', borderRadius: 'var(--radius-full)', background: 'var(--color-primary-soft)', color: 'var(--color-primary-dark)', fontSize: 11, fontWeight: 600 }

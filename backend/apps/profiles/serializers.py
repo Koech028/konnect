@@ -85,3 +85,22 @@ class VerificationRequestSerializer(serializers.ModelSerializer):
 
 class ProfileReadSerializer(UserSerializer):
     pass
+
+
+class DiscoveryProfileSerializer(UserSerializer):
+    shared_interests = serializers.SerializerMethodField()
+    same_city = serializers.SerializerMethodField()
+
+    class Meta(UserSerializer.Meta):
+        fields = UserSerializer.Meta.fields + ('shared_interests', 'same_city')
+
+    def get_shared_interests(self, obj):
+        viewer_interests = self.context.get('viewer_interests', set())
+        return [
+            interest for interest in (obj.interests or [])
+            if isinstance(interest, str) and interest.strip().casefold() in viewer_interests
+        ]
+
+    def get_same_city(self, obj):
+        viewer_city = self.context.get('viewer_city', '')
+        return bool(viewer_city and (obj.city or '').strip().casefold() == viewer_city)

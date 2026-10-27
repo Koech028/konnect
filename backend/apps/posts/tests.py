@@ -57,6 +57,33 @@ class PostApiTests(APITestCase):
         detail = self.client.get(f'/api/v1/posts/{post_id}/')
         self.assertEqual(detail.data['engagement']['comments_count'], 1)
 
+    def test_video_post_requires_one_supported_https_video(self):
+        created = self.client.post('/api/v1/posts/', {
+            'type': 'video',
+            'content': {
+                'text': 'A day outdoors',
+                'media': ['https://media.example.com/day.mp4'],
+            },
+        }, format='json')
+        self.assertEqual(created.status_code, 201, created.data)
+        self.assertEqual(created.data['type'], 'video')
+        self.assertEqual(created.data['content']['media'], ['https://media.example.com/day.mp4'])
+
+        no_media = self.client.post('/api/v1/posts/', {
+            'type': 'video',
+            'content': {'text': 'Missing video'},
+        }, format='json')
+        self.assertEqual(no_media.status_code, 400)
+
+        unsupported = self.client.post('/api/v1/posts/', {
+            'type': 'video',
+            'content': {
+                'text': 'Unsupported type',
+                'media': ['https://media.example.com/day.avi'],
+            },
+        }, format='json')
+        self.assertEqual(unsupported.status_code, 400)
+
     def test_poll_vote_updates_frontend_poll_counts(self):
         create = self.client.post('/api/v1/posts/', {
             'type': 'poll',
@@ -142,6 +169,17 @@ class PostApiTests(APITestCase):
             'size': 128,
         }, format='json')
         self.assertEqual(response.status_code, 400)
+
+    def test_hidden_account_cannot_request_media_upload(self):
+        self.reader.profile_status = User.ProfileStatus.HIDDEN
+        self.reader.save(update_fields=('profile_status',))
+
+        response = self.client.post('/api/v1/media/upload-url/', {
+            'content_type': 'image/png',
+            'size': 128,
+        }, format='json')
+
+        self.assertEqual(response.status_code, 403)
 
     def test_member_cannot_edit_another_members_post(self):
         self.client.force_authenticate(self.author)
