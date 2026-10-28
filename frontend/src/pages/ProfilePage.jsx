@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
+import { UserPlus } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import ProfileHeader from '../components/profile/ProfileHeader'
 import PhotoGrid from '../components/profile/PhotoGrid'
@@ -36,6 +36,10 @@ export default function ProfilePage() {
         <ProfileAction to="/likes" label="Likes & matches" />
         <ProfileAction to="/settings" label="Settings" />
       </div>
+      <Link to="/referrals" style={inviteLinkStyle}>
+        <UserPlus size={19} />
+        <span><strong>Invite friends</strong><small style={{ display: 'block', marginTop: 3, color: 'var(--color-text-secondary)', fontSize: 12 }}>Share your link and see who joins</small></span>
+      </Link>
 
       <div style={{
         display: 'flex',
@@ -178,3 +182,5 @@ export default function ProfilePage() {
 function ProfileAction({ to, label }) {
   return <Link to={to} style={{ padding: '12px', textAlign: 'center', textDecoration: 'none', color: 'var(--color-primary)', fontSize: '14px', fontWeight: 600, background: 'var(--color-surface)', borderRadius: 'var(--radius-md)', boxShadow: 'var(--shadow-sm)' }}>{label}</Link>
 }
+
+const inviteLinkStyle = { display: 'flex', alignItems: 'center', gap: 12, margin: '0 var(--space-md) var(--space-md)', padding: 14, borderRadius: 'var(--radius-lg)', background: 'var(--color-primary-soft)', color: 'var(--color-primary)', textDecoration: 'none' }

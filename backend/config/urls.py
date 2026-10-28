@@ -36,7 +36,7 @@ from apps.community.views import (
     StoryDetailView,
     StoryListCreateView,
 )
-from apps.accounts.views import PremiumStatusView
+from apps.accounts.views import MyReferralsView, PremiumStatusView
 from config.media import MediaUploadUrlView
 
 
@@ -55,6 +55,7 @@ urlpatterns = [
     path('api/v1/auth/login/', LoginView.as_view(), name='token-obtain-pair'),
     path('api/v1/auth/refresh/', TokenRefreshView.as_view(), name='token-refresh'),
     path('api/v1/auth/me/', CurrentUserView.as_view(), name='current-user'),
+    path('api/v1/referrals/me/', MyReferralsView.as_view(), name='my-referrals'),
     path('api/v1/premium/', PremiumStatusView.as_view(), name='premium-status'),
     path('api/v1/auth/password-reset/', PasswordResetRequestView.as_view(), name='password-reset-request'),
     path('api/v1/auth/password-reset/confirm/', PasswordResetConfirmView.as_view(), name='password-reset-confirm'),

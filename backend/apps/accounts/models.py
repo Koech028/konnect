@@ -60,6 +60,15 @@ class User(AbstractUser):
     city = models.CharField(max_length=100, blank=True)
     country = models.CharField(max_length=100, blank=True, default='Kenya')
     avatar_url = models.URLField(blank=True)
+    cover_image_url = models.URLField(blank=True)
+    referral_code = models.CharField(max_length=32, unique=True, blank=True)
+    referred_by = models.ForeignKey(
+        'self',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='referred_users',
+    )
     interests = models.JSONField(default=list, blank=True)
     preferences = models.JSONField(default=dict, blank=True)
     verification_status = models.CharField(
@@ -82,11 +91,13 @@ class User(AbstractUser):
         ]
 
     USERNAME_FIELD = 'email'
-    REQUIRED_FIELDS = []
+    REQUIRED_FIELDS = ['age']
 
     def __str__(self):
         return self.email
 
     def save(self, *args, **kwargs):
         self.email = self.email.strip().lower()
+        if not self.referral_code:
+            self.referral_code = uuid.uuid4().hex
         super().save(*args, **kwargs)

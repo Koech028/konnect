@@ -61,6 +61,14 @@ class CurrentUserView(APIView):
         return Response(CurrentUserSerializer(request.user, context={'request': request}).data)
 
 
+class MyReferralsView(APIView):
+    def get(self, request):
+        return Response({
+            'referral_code': request.user.referral_code,
+            'successful_signups': request.user.referred_users.count(),
+        })
+
+
 class PremiumStatusView(APIView):
     def get(self, request):
         return Response({

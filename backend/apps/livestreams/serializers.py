@@ -1,6 +1,6 @@
 from rest_framework import serializers
 
-from apps.livestreams.models import Gift, LiveStream
+from apps.livestreams.models import Gift, LiveStream, MAX_LIVE_ENTRY_PRICE
 
 
 class LiveStreamSerializer(serializers.ModelSerializer):
@@ -10,12 +10,13 @@ class LiveStreamSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = LiveStream
-        fields = ('id', 'title', 'status', 'host_id', 'host_name', 'host_avatar_url', 'created_at')
+        fields = ('id', 'title', 'status', 'entry_price', 'host_id', 'host_name', 'host_avatar_url', 'created_at')
         read_only_fields = fields
 
 
 class CreateLiveStreamSerializer(serializers.Serializer):
-    title = serializers.CharField(max_length=80, trim_whitespace=True)
+    title = serializers.CharField(max_length=80, trim_whitespace=True, required=False, allow_blank=True, default='')
+    entry_price = serializers.IntegerField(min_value=0, max_value=MAX_LIVE_ENTRY_PRICE, required=False, default=0)
 
 
 class GiftSerializer(serializers.ModelSerializer):

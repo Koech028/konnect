@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { Image, X, CalendarDays, Video } from 'lucide-react'
+import { Image, X, CalendarDays, Video, BarChart3, Type } from 'lucide-react'
 import PageHeader from '../components/common/PageHeader'
 import { useAuth } from '../context/AuthContext'
 import { useAppData } from '../context/AppDataContext'
@@ -114,6 +114,10 @@ export default function CreatePostPage() {
       setError('A poll needs at least two options.')
       return
     }
+    if (type === 'video' && !media) {
+      setError('Choose a video to include in your post.')
+      return
+    }
 
     setIsSaving(true)
     setError('')
@@ -148,14 +152,38 @@ export default function CreatePostPage() {
     <>
       <PageHeader title={existingPost ? 'Edit post' : 'Create a post'} />
       <form onSubmit={handleSubmit} style={cardStyle}>
-        <label htmlFor="post-type" style={{ display: 'block', fontSize: '14px', fontWeight: 600, marginBottom: '8px' }}>Post type</label>
-        <select id="post-type" value={type} disabled={isUploadingMedia} onChange={event => { setType(event.target.value); setMedia('') }} style={{ ...fieldStyle, marginBottom: '16px' }}>
-          <option value="status">Status</option>
-          <option value="photo">Photo</option>
-          <option value="video">Video</option>
-          <option value="poll">Poll</option>
-          <option value="event">Event</option>
-        </select>
+        <fieldset disabled={isUploadingMedia} style={{ border: 0, padding: 0, margin: '0 0 18px' }}>
+          <legend style={{ fontSize: '14px', fontWeight: 600, marginBottom: '10px' }}>{existingPost ? 'Post format' : 'Add to your post'}</legend>
+          <div style={suggestionsStyle}>
+            {[
+              { id: 'status', label: 'Text', icon: Type },
+              { id: 'photo', label: 'Photo', icon: Image },
+              { id: 'video', label: 'Video', icon: Video },
+              { id: 'poll', label: 'Poll', icon: BarChart3 },
+              { id: 'event', label: 'Event', icon: CalendarDays }
+            ].map(({ id, label, icon: Icon }) => (
+              <button
+                key={id}
+                type="button"
+                aria-pressed={type === id}
+                onClick={() => {
+                  if (type !== id) setMedia('')
+                  setType(id)
+                  setError('')
+                }}
+                style={{
+                  ...suggestionButtonStyle,
+                  borderColor: type === id ? 'var(--color-primary)' : 'var(--color-border)',
+                  background: type === id ? 'var(--color-primary-soft)' : 'var(--color-bg)',
+                  color: type === id ? 'var(--color-primary-dark)' : 'var(--color-text-secondary)'
+                }}
+              >
+                <Icon size={18} />
+                {label}
+              </button>
+            ))}
+          </div>
+        </fieldset>
 
         <label htmlFor="post-text" style={{ display: 'block', fontSize: '14px', fontWeight: 600, marginBottom: '8px' }}>
           {type === 'event' ? 'Event details' : 'What would you like to share?'}
@@ -167,7 +195,7 @@ export default function CreatePostPage() {
           rows={5}
           maxLength={2000}
           required
-          placeholder="Write something..."
+          placeholder={type === 'poll' ? 'Ask a question...' : type === 'event' ? 'Share event details...' : "What's on your mind?"}
           style={{ ...fieldStyle, resize: 'vertical', lineHeight: 1.5 }}
         />
         <p style={{ textAlign: 'right', fontSize: '12px', color: 'var(--color-text-muted)', marginTop: '4px' }}>{text.length}/2000</p>
@@ -207,23 +235,23 @@ export default function CreatePostPage() {
                 <button type="button" onClick={() => setMedia('')} aria-label="Remove image" style={{ ...iconButtonStyle, position: 'absolute', top: '8px', right: '8px', background: 'var(--color-surface)' }}><X size={18} /></button>
               </div>
             )}
+            <p style={{ fontSize: '12px', color: 'var(--color-text-muted)', marginTop: '6px' }}>Images are securely uploaded to cloud storage. Maximum source file size: 5 MB.</p>
+          </div>
+        )}
 
-            {type === 'video' && (
-              <div style={{ marginTop: '16px' }}>
-                <label htmlFor="post-video" style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px', fontWeight: 600, marginBottom: '8px' }}>
-                  <Video size={18} /> Add a short video
-                </label>
-                <input id="post-video" type="file" accept="video/mp4,video/webm,video/quicktime" onChange={handleVideo} />
-                {media && (
-                  <div style={{ position: 'relative', marginTop: '12px' }}>
-                    <video src={media} controls playsInline preload="metadata" style={{ display: 'block', width: '100%', maxHeight: '400px', borderRadius: 'var(--radius-md)', background: '#111' }} />
-                    <button type="button" onClick={() => setMedia('')} aria-label="Remove video" style={{ ...iconButtonStyle, position: 'absolute', top: '8px', right: '8px', background: 'var(--color-surface)' }}><X size={18} /></button>
-                  </div>
-                )}
-                <p style={{ fontSize: '12px', color: 'var(--color-text-muted)', marginTop: '6px' }}>MP4, WebM, or QuickTime; up to 60 seconds and 50 MB. Uploads go directly to configured cloud storage.</p>
+        {type === 'video' && (
+          <div style={{ marginTop: '16px' }}>
+            <label htmlFor="post-video" style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px', fontWeight: 600, marginBottom: '8px' }}>
+              <Video size={18} /> Add a short video
+            </label>
+            <input id="post-video" type="file" accept="video/mp4,video/webm,video/quicktime" onChange={handleVideo} />
+            {media && (
+              <div style={{ position: 'relative', marginTop: '12px' }}>
+                <video src={media} controls playsInline preload="metadata" style={{ display: 'block', width: '100%', maxHeight: '400px', borderRadius: 'var(--radius-md)', background: '#111' }} />
+                <button type="button" onClick={() => setMedia('')} aria-label="Remove video" style={{ ...iconButtonStyle, position: 'absolute', top: '8px', right: '8px', background: 'var(--color-surface)' }}><X size={18} /></button>
               </div>
             )}
-            <p style={{ fontSize: '12px', color: 'var(--color-text-muted)', marginTop: '6px' }}>Images are securely uploaded to cloud storage. Maximum source file size: 5 MB.</p>
+            <p style={{ fontSize: '12px', color: 'var(--color-text-muted)', marginTop: '6px' }}>MP4, WebM, or QuickTime; up to 60 seconds and 50 MB.</p>
           </div>
         )}
 
@@ -248,6 +276,8 @@ const primaryButtonStyle = {
   fontWeight: 700,
   cursor: 'pointer'
 }
+const suggestionsStyle = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(88px, 1fr))', gap: 8 }
+const suggestionButtonStyle = { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, minHeight: 42, padding: '8px 10px', border: '1px solid', borderRadius: 'var(--radius-md)', font: 'inherit', fontSize: 13, fontWeight: 600, cursor: 'pointer' }
 
 const iconButtonStyle = {
   display: 'flex',

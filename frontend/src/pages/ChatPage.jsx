@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { useParams } from 'react-router-dom'
+import { useLocation, useParams } from 'react-router-dom'
 import MessageThread from '../components/messages/MessageThread'
 import { api } from '../utils/api'
 import { useAuth } from '../context/AuthContext'
 
 export default function ChatPage() {
   const { matchId } = useParams()
+  const location = useLocation()
   const { user } = useAuth()
   const [messages, setMessages] = useState([])
   const [match, setMatch] = useState(null)
@@ -111,6 +112,7 @@ export default function ChatPage() {
       messages={messages}
       currentUserId={user?.id}
       currentUserInterests={user?.interests || []}
+      suggestedMessage={location.state?.suggestedMessage || ''}
       otherUserTyping={otherUserTyping}
       onTyping={handleTyping}
       onSendMessage={handleSendMessage}

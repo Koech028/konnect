@@ -24,6 +24,7 @@ import LivePage from './pages/LivePage'
 import EventsPage from './pages/EventsPage'
 import PremiumPage from './pages/PremiumPage'
 import ShortsPage from './pages/ShortsPage'
+import ReferralPage from './pages/ReferralPage'
 const LiveRoomPage = lazy(() => import('./pages/LiveRoomPage'))
 
 function ProtectedRoute({ children }) {
@@ -65,6 +66,7 @@ export default function App() {
         <Route path="/profile" element={<ProfilePage />} />
         <Route path="/profile/edit" element={<EditProfilePage />} />
         <Route path="/settings" element={<SettingsPage />} />
+        <Route path="/referrals" element={<ReferralPage />} />
         <Route path="/create" element={<CreatePostPage />} />
         <Route path="/posts/:postId" element={<PostDetailPage />} />
         <Route path="/posts/:postId/edit" element={<CreatePostPage />} />

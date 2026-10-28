@@ -5,7 +5,7 @@ import { Room, RoomEvent, Track } from 'livekit-client'
 import { api } from '../utils/api'
 import { useAuth } from '../context/AuthContext'
 
-const giftEmojis = { rose: '🌹', heart: '💖', star: '⭐' }
+const giftEmojis = { rose: '🌹', heart: '💖', star: '⭐', wave: '🌊' }
 
 function ParticipantTile({ participant, local = false }) {
   const videoRef = useRef(null)
@@ -42,9 +42,13 @@ export default function LiveRoomPage() {
   const [room, setRoom] = useState(null)
   const [, setRefreshCount] = useState(0)
   const [balance, setBalance] = useState(0)
+  const [promotionalBalance, setPromotionalBalance] = useState(0)
+  const [purchasedBalance, setPurchasedBalance] = useState(0)
   const [giftCatalog, setGiftCatalog] = useState([])
   const [giftEvents, setGiftEvents] = useState([])
   const [loading, setLoading] = useState(true)
+  const [entryConfirmationRequired, setEntryConfirmationRequired] = useState(false)
+  const [joining, setJoining] = useState(false)
   const [sendingGift, setSendingGift] = useState(false)
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
@@ -68,9 +72,24 @@ export default function LiveRoomPage() {
         if (cancelled) return
         setStream(streamData)
         setBalance(walletData.balance)
+        setPromotionalBalance(walletData.promotional_balance)
+        setPurchasedBalance(walletData.purchased_balance)
         setGiftCatalog(walletData.gift_catalog)
-        const joinData = await api.post(`/api/v1/live/${streamId}/join/`, {})
-        if (!cancelled) setCredentials(joinData)
+        const requiresConfirmation = (
+          streamData.host_id !== user?.id
+          && streamData.entry_price > 0
+          && !streamData.has_access
+        )
+        setEntryConfirmationRequired(requiresConfirmation)
+        if (!requiresConfirmation) {
+          const joinData = await api.post(`/api/v1/live/${streamId}/join/`, {})
+          if (!cancelled) {
+            setCredentials(joinData)
+            if (joinData.wallet_balance !== null) setBalance(joinData.wallet_balance)
+            if (joinData.promotional_balance !== null) setPromotionalBalance(joinData.promotional_balance)
+            if (joinData.purchased_balance !== null) setPurchasedBalance(joinData.purchased_balance)
+          }
+        }
       } catch (err) {
         if (!cancelled) setError(err.message || 'This live stream could not be joined.')
       } finally {
@@ -79,7 +98,25 @@ export default function LiveRoomPage() {
     }
     load()
     return () => { cancelled = true }
-  }, [streamId])
+  }, [streamId, user?.id])
+
+  const confirmPaidEntry = async () => {
+    if (joining) return
+    setJoining(true)
+    setError('')
+    try {
+      const joinData = await api.post(`/api/v1/live/${streamId}/join/`, {})
+      setCredentials(joinData)
+      if (joinData.wallet_balance !== null) setBalance(joinData.wallet_balance)
+      if (joinData.promotional_balance !== null) setPromotionalBalance(joinData.promotional_balance)
+      if (joinData.purchased_balance !== null) setPurchasedBalance(joinData.purchased_balance)
+      setEntryConfirmationRequired(false)
+    } catch (err) {
+      setError(err.message || 'This live stream could not be joined.')
+    } finally {
+      setJoining(false)
+    }
+  }
 
   useEffect(() => {
     if (!credentials || !stream) return undefined
@@ -204,6 +241,8 @@ export default function LiveRoomPage() {
     try {
       const result = await api.post(`/api/v1/live/${streamId}/gifts/`, { gift_type: gift.type })
       setBalance(result.wallet_balance)
+      setPromotionalBalance(result.promotional_balance)
+      setPurchasedBalance(result.purchased_balance)
       try {
         await roomRef.current.localParticipant.publishData(
           new TextEncoder().encode(JSON.stringify({ type: 'gift', gift: result.gift })),
@@ -242,6 +281,27 @@ export default function LiveRoomPage() {
 
   if (loading) return <p role="status" style={{ padding: 24 }}>Joining live stream…</p>
   if (!stream && error) return <div style={{ padding: 24 }}><p role="alert" style={errorStyle}>{error}</p><button type="button" onClick={() => navigate('/live')} style={secondaryButtonStyle}>Back to live streams</button></div>
+  if (stream && entryConfirmationRequired && !credentials) {
+    const canAffordEntry = balance >= stream.entry_price
+    return (
+      <div style={entryGateStyle}>
+        <section style={entryGateCardStyle}>
+          <h2 style={{ margin: '0 0 8px', fontSize: 22 }}>Join {stream.host_name}’s live?</h2>
+          <p style={{ margin: '0 0 16px', color: 'var(--color-text-secondary)' }}>{stream.title}</p>
+          <p style={entryCostStyle}>{stream.entry_price} credits</p>
+          <p style={{ margin: '0 0 18px', color: 'var(--color-text-secondary)', fontSize: 14 }}>
+            Your balance: {balance} credits (bonus {promotionalBalance}, purchased {purchasedBalance}). This entry fee is charged once; reconnecting will not charge again.
+          </p>
+          {!canAffordEntry && <p role="alert" style={errorStyle}>You need {stream.entry_price - balance} more credits to join.</p>}
+          {error && canAffordEntry && <p role="alert" style={errorStyle}>{error}</p>}
+          <button type="button" disabled={!canAffordEntry || joining} onClick={confirmPaidEntry} style={joinPaidButtonStyle}>
+            {joining ? 'Joining…' : `Join for ${stream.entry_price} credits`}
+          </button>
+          <button type="button" onClick={() => navigate('/live')} style={backToLiveButtonStyle}>Not now</button>
+        </section>
+      </div>
+    )
+  }
 
   return (
     <div style={{ padding: 'var(--space-md)' }}>
@@ -287,11 +347,14 @@ export default function LiveRoomPage() {
             <button type="button" onClick={endStream} style={endButtonStyle}>End live stream</button>
           </>
           : <>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
               <strong style={{ fontSize: 14 }}>Send a gift</strong>
               <span style={{ color: 'var(--color-text-secondary)', fontSize: 13 }}>{balance} credits</span>
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
+            <p style={{ margin: '0 0 10px', color: 'var(--color-text-tertiary)', fontSize: 11 }}>
+              Bonus: {promotionalBalance} · Purchased: {purchasedBalance}
+            </p>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 8 }}>
               {giftCatalog.map(gift => (
                 <button
                   key={gift.type}
@@ -302,7 +365,7 @@ export default function LiveRoomPage() {
                 >
                   <span style={{ fontSize: 23 }}>{giftEmojis[gift.type]}</span>
                   <span>{gift.name}</span>
-                  <small>{gift.credits} credits</small>
+                  <small>{gift.credits ? `${gift.credits} credits` : 'Free'}</small>
                 </button>
               ))}
             </div>
@@ -322,6 +385,11 @@ const participantNameStyle = { position: 'absolute', left: 10, bottom: 8, paddin
 const stageStyle = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 10, minHeight: 260, padding: 8, borderRadius: 'var(--radius-lg)', background: '#111' }
 const connectingStyle = { gridColumn: '1 / -1', alignSelf: 'center', textAlign: 'center', color: '#fff', padding: 16 }
 const controlsStyle = { marginTop: 14, padding: 14, borderRadius: 'var(--radius-lg)', background: 'var(--color-surface)', boxShadow: 'var(--shadow-sm)' }
+const entryGateStyle = { minHeight: 'calc(100vh - var(--header-height) - var(--bottom-nav-height))', display: 'grid', placeItems: 'center', padding: 'var(--space-md)' }
+const entryGateCardStyle = { width: 'min(100%, 440px)', padding: 'var(--space-lg)', borderRadius: 'var(--radius-lg)', background: 'var(--color-surface)', boxShadow: 'var(--shadow-md)', textAlign: 'center' }
+const entryCostStyle = { margin: '0 0 8px', color: 'var(--color-primary)', fontSize: 28, fontWeight: 800 }
+const joinPaidButtonStyle = { width: '100%', padding: 13, border: 0, borderRadius: 'var(--radius-md)', background: 'var(--color-primary)', color: '#fff', font: 'inherit', fontWeight: 700, cursor: 'pointer' }
+const backToLiveButtonStyle = { width: '100%', marginTop: 8, padding: 12, border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', background: 'transparent', color: 'var(--color-text-secondary)', font: 'inherit', cursor: 'pointer' }
 const deviceControlsStyle = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 8, marginBottom: 8 }
 const deviceButtonStyle = { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, padding: 11, border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', background: 'var(--color-bg)', color: 'var(--color-text-primary)', font: 'inherit', fontSize: 13, fontWeight: 600, cursor: 'pointer' }
 const deviceHelpStyle = { margin: '4px 0 12px', color: 'var(--color-text-secondary)', fontSize: 12 }

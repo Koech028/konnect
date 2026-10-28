@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { Bell, Shield, BadgeCheck, LockKeyhole, LogOut, Moon, Sun, ChevronRight, UserRound, Sparkles } from 'lucide-react'
+import { Bell, Shield, BadgeCheck, LockKeyhole, LogOut, Moon, Sun, ChevronRight, UserRound, Sparkles, UserPlus } from 'lucide-react'
 import PageHeader from '../components/common/PageHeader'
 import { useAuth } from '../context/AuthContext'
 import { useTheme } from '../context/ThemeContext'
@@ -124,6 +124,7 @@ export default function SettingsPage() {
         <section style={cardStyle}>
           <h2 style={titleStyle}>Your account</h2>
           <SettingLink to="/profile/edit" icon={<UserRound size={18} />} title="Edit profile" description="Update your details and photos" />
+          <SettingLink to="/referrals" icon={<UserPlus size={18} />} title="Invite friends" description="Share your referral link and track signups" />
           <SettingLink to="/verification" icon={<BadgeCheck size={18} />} title="Profile verification" description="Request a verification review" />
           <SettingLink to="/premium" icon={<Sparkles size={18} />} title="LinkUp Premium" description="View your plan and available benefits" />
           <SettingLink to="/safety" icon={<Shield size={18} />} title="Safety center" description="Manage reports and blocked profiles" />

@@ -79,7 +79,7 @@ class ProfileViewSet(viewsets.GenericViewSet):
         if gender and gender.lower() != 'everyone':
             gender = genders.get(gender.lower(), gender.lower())
             queryset = queryset.filter(gender=gender)
-        elif preferences.get('interested_in'):
+        elif not gender and preferences.get('interested_in'):
             selected_genders = [genders.get(value.lower(), value.lower()) for value in preferences['interested_in']]
             queryset = queryset.filter(gender__in=selected_genders)
         if verified == 'true':

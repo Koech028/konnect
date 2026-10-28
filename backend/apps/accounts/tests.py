@@ -36,6 +36,65 @@ class AccountApiTests(APITestCase):
         self.assertEqual(current.status_code, 200)
         self.assertEqual(current.data['email'], 'new-member@example.com')
 
+    def test_referral_link_attributes_new_signup_and_counts_it_for_referrer(self):
+        referrer = User.objects.create_user(
+            email='inviter@example.com',
+            password='Mango!Sunrise_2026',
+            display_name='Inviter',
+            age=30,
+            gender='woman',
+        )
+        response = self.client.post('/api/v1/auth/register/', {
+            'email': 'invited@example.com',
+            'password': 'Mango!Sunrise_2026',
+            'display_name': 'Invited Member',
+            'age': 26,
+            'gender': 'man',
+            'referral_code': referrer.referral_code,
+        }, format='json')
+
+        self.assertEqual(response.status_code, 201)
+        invited = User.objects.get(email='invited@example.com')
+        self.assertEqual(invited.referred_by, referrer)
+        self.assertNotIn('referral_code', response.data['user'])
+        self.client.force_authenticate(referrer)
+        referrals = self.client.get('/api/v1/referrals/me/')
+        self.assertEqual(referrals.status_code, 200)
+        self.assertEqual(referrals.data, {
+            'referral_code': referrer.referral_code,
+            'successful_signups': 1,
+        })
+
+    def test_invalid_referral_code_does_not_create_account(self):
+        response = self.client.post('/api/v1/auth/register/', {
+            'email': 'invalid-referral@example.com',
+            'password': 'Mango!Sunrise_2026',
+            'display_name': 'No Referral',
+            'age': 26,
+            'gender': 'man',
+            'referral_code': 'not-a-real-code',
+        }, format='json')
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('referral_code', response.data)
+        self.assertFalse(User.objects.filter(email='invalid-referral@example.com').exists())
+
+    def test_referral_endpoint_requires_authentication_and_code_is_not_public(self):
+        user = User.objects.create_user(
+            email='private-referral@example.com',
+            password='Mango!Sunrise_2026',
+            display_name='Private Referral',
+            age=25,
+            gender='woman',
+        )
+        unauthenticated = self.client.get('/api/v1/referrals/me/')
+        self.assertEqual(unauthenticated.status_code, 401)
+
+        self.client.force_authenticate(user)
+        public_profile = self.client.get(f'/api/v1/profiles/{user.id}/')
+        self.assertEqual(public_profile.status_code, 200)
+        self.assertNotIn('referral_code', public_profile.data)
+
     def test_registration_email_is_case_insensitive(self):
         payload = {
             'email': 'Case.Member@example.com',

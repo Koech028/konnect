@@ -48,7 +48,8 @@ export function AuthProvider({ children }) {
         gender: userData.gender,
         bio: userData.bio || '',
         interests: userData.interests || [],
-        location: userData.location
+        location: userData.location,
+        referral_code: userData.referral_code || ''
       })
       setTokens(result)
       setUser(result.user)

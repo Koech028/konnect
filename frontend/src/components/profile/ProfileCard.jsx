@@ -3,7 +3,7 @@ import Avatar from '../common/Avatar'
 import Badge from '../common/Badge'
 import { useNavigate } from 'react-router-dom'
 
-export default function ProfileCard({ user, onLike, liked }) {
+export default function ProfileCard({ user, onLike, liked, liking = false }) {
   const navigate = useNavigate()
 
   return (
@@ -74,6 +74,8 @@ export default function ProfileCard({ user, onLike, liked }) {
             onLike?.(user.id)
           }}
           aria-label={liked ? `Unlike ${user.display_name}` : `Like ${user.display_name}`}
+          aria-busy={liking}
+          disabled={liking}
           style={{
             width: '40px',
             height: '40px',
@@ -81,7 +83,8 @@ export default function ProfileCard({ user, onLike, liked }) {
             border: 'none',
             background: liked ? 'var(--color-primary)' : 'var(--color-border-light)',
             color: liked ? 'white' : 'var(--color-text-muted)',
-            cursor: 'pointer',
+            cursor: liking ? 'wait' : 'pointer',
+            opacity: liking ? 0.7 : 1,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
