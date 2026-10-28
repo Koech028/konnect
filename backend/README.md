@@ -73,7 +73,7 @@ Access tokens expire after 30 minutes; refresh tokens last 7 days.
 
 ### `POST /api/v1/auth/register/`
 
-Accepts `email`, `password`, `display_name`, `age` (18+), `gender`, optional `bio`, `interests`, and either a `location: {city, country}` object or flat `city` / `country` fields. Returns `{user, access, refresh}`.
+Accepts `email`, `password`, `display_name`, `age` (18+), `gender`, optional `bio`, `interests`, optional `referral_code`, and either a `location: {city, country}` object or flat `city` / `country` fields. Returns `{user, access, refresh}`.
 
 ### `POST /api/v1/auth/login/`
 
@@ -87,6 +87,10 @@ Accepts `{refresh}` and returns a refreshed token pair.
 
 Returns the current user.
 
+### `GET /api/v1/referrals/me/`
+
+Returns the signed-in user's private referral code and count of accounts created using that code.
+
 ### Password reset
 
 * `POST /api/v1/auth/password-reset/` with `{email}` sends a one-time reset link. Responses do not disclose whether an account exists.
@@ -99,7 +103,7 @@ The React app currently has the password-request screen only. Add a `/reset-pass
 | Method | Endpoint | Purpose |
 | --- | --- | --- |
 | GET | `/api/v1/profiles/me/` | Read the current profile |
-| PATCH | `/api/v1/profiles/me/` | Edit profile fields, location, interests, preferences, or visibility |
+| PATCH | `/api/v1/profiles/me/` | Edit profile fields, location, interests, preferences, visibility, or `cover_image_url` |
 | GET | `/api/v1/profiles/{user_id}/` | Read an active public profile |
 | GET | `/api/v1/discover/?q=&gender=&age_min=&age_max=&verified=&shared_interests=` | Search/filter active profiles; includes shared interest and same-city signals |
 | GET, POST | `/api/v1/profiles/me/photos/` | List or add photo URL records (maximum 6) |
@@ -141,11 +145,17 @@ The React app currently has the password-request screen only. Add a `/reset-pass
 | GET, POST | `/api/v1/safety/reports/` | List or submit a report |
 | GET, POST | `/api/v1/safety/content-reports/` | List your reports or report a Short/comment for staff review |
 | GET, POST | `/api/v1/live/` | List live streams or start one |
-| GET | `/api/v1/live/wallet/` | Read virtual credit balance and gift catalog |
+| GET | `/api/v1/live/wallet/` | Read promotional/purchased credit balances, gift catalog, and disabled purchase/payout status |
 | GET | `/api/v1/live/{stream_id}/` | Read a live stream |
 | POST | `/api/v1/live/{stream_id}/join/` | Get a short-lived LiveKit room token |
 | POST | `/api/v1/live/{stream_id}/end/` | End a stream (host only) |
 | POST | `/api/v1/live/{stream_id}/gifts/` | Send a virtual gift using credits |
+
+Profile gallery photos are managed independently from the cover image. Select the profile picture from the gallery; change or clear `cover_image_url` separately through `PATCH /api/v1/profiles/me/`. Both images use the authenticated media upload flow.
+
+## Referral links
+
+Each account has a private, unique referral code. The profile/settings invite page builds a `/signup?ref=...` link, and registration stores the referring account when a valid code is submitted. `GET /api/v1/referrals/me/` returns only the current user's code and attributed signup count; referral codes are not included in public profile responses. This first version only tracks signups and provides share/copy actions; it offers no cash, credit, or premium rewards. Do not promise rewards unless a future version defines eligibility, abuse prevention, and applicable legal and tax treatment.
 
 ## Discovery and conversations
 
@@ -157,7 +167,15 @@ New match conversations show optional icebreaker suggestions based on shared int
 
 For the simplest setup, create a LiveKit Cloud project and copy its server URL, API key, and API secret into `LIVEKIT_URL`, `LIVEKIT_API_KEY`, and `LIVEKIT_API_SECRET` in `backend/.env`. Restart Django after changing the file. For deployment, set the same three variables as secrets on the `linkup-api` service. Never expose the API secret to the browser. A stream is unavailable until these settings are present. Only the host receives publish permissions; signed-in viewers receive subscribe-only video access. Account blocks also hide and prevent joining each other's streams.
 
-New wallets start with 100 virtual credits. Roses cost 10 credits, hearts 25, and stars 50; gifts transfer credits to the host. Credits have no cash value, are not purchasable, and cannot be withdrawn. These starter credits are a launch/testing system, not a payment or payout feature.
+### Credit wallet and creator earnings foundation
+
+New wallets receive 100 promotional credits. Existing wallet balances are also classified as promotional during the accounting migration; they are not treated as purchases, and no existing balance is lost. The wallet tracks promotional and purchased credits separately while exposing their sum as the balance. Promotional credits are spent first, so starter and promotional credits cannot create creator earnings.
+
+The planned example price is 100 credits for KSh 50 (KSh 0.50 per credit). This is only a displayed planning rate: there is no checkout or purchase endpoint, no payment provider connected, and purchases are disabled. `GET /api/v1/live/wallet/` exposes the proposed bundle and explicitly returns `checkout_enabled: false` and `withdrawals_enabled: false`. Never grant purchased credits based on a browser request or an unverified payment notification. A future integration must use a chosen payment aggregator, verify signed server-to-server callbacks, make payment references idempotent, and reconcile provider settlements before granting credits.
+
+Roses cost 10 credits, hearts 25, stars 50, and waves are free. Spending credits does not transfer credits into a host's spendable wallet. The 80% creator / 20% platform split is a provisional accounting estimate, calculated only against purchased credits used for gifts or paid live entry; promotional credits earn nothing. For example, 10 eligible purchased credits are currently estimated at KSh 5 gross, KSh 4 for the creator, and KSh 1 for the platform. These are pending, non-withdrawable estimates, not settled or payable money. Actual rates, payment-provider fees, refunds, chargebacks, taxes, and payout expenses are not yet accounted for; do not make payouts or describe these estimates as guaranteed income.
+
+There is no creator withdrawal feature or real-money movement. Before enabling payment or payout, choose and test a provider in its sandbox; implement signature verification, idempotency, payment/credit reconciliation, refund and chargeback reversals, audit monitoring, and secure creator verification; and obtain qualified Kenyan legal and tax advice on payment, consumer-protection, tax, and any other applicable obligations. This documentation describes implementation intent, not legal advice or a claim that the product is compliant.
 
 ## Stories, events, verification, and premium
 

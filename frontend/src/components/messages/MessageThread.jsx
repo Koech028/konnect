@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom'
 import MessageBubble from './MessageBubble'
 import Avatar from '../common/Avatar'
 
-export default function MessageThread({ match, messages, currentUserId, currentUserInterests = [], otherUserTyping, onTyping, onSendMessage }) {
+export default function MessageThread({ match, messages, currentUserId, currentUserInterests = [], suggestedMessage = '', otherUserTyping, onTyping, onSendMessage }) {
   const [newMessage, setNewMessage] = useState('')
   const messagesEndRef = useRef(null)
   const navigate = useNavigate()
@@ -16,6 +16,10 @@ export default function MessageThread({ match, messages, currentUserId, currentU
   useEffect(() => {
     scrollToBottom()
   }, [messages])
+
+  useEffect(() => {
+    if (!messages.length && suggestedMessage) setNewMessage(suggestedMessage)
+  }, [messages.length, suggestedMessage])
 
   const [error, setError] = useState('')
   const otherInterests = new Set((match.user.interests || [])

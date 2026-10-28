@@ -47,10 +47,50 @@ class ProfileApiTests(APITestCase):
         self.assertEqual(response.data['location']['city'], 'Westlands')
         self.assertEqual(response.data['preferences']['age_max'], 36)
 
+    def test_cover_picture_is_independent_of_profile_picture(self):
+        profile_photo = self.client.post('/api/v1/profiles/me/photos/', {
+            'url': 'https://example.com/avatar.jpg',
+            'is_primary': True,
+        }, format='json')
+        self.assertEqual(profile_photo.status_code, 201)
+
+        updated = self.client.patch('/api/v1/profiles/me/', {
+            'cover_image_url': 'https://example.com/cover.jpg',
+        }, format='json')
+
+        self.assertEqual(updated.status_code, 200)
+        self.assertEqual(updated.data['avatar'], 'https://example.com/avatar.jpg')
+        self.assertEqual(updated.data['cover_image_url'], 'https://example.com/cover.jpg')
+        second_photo = self.client.post('/api/v1/profiles/me/photos/', {
+            'url': 'https://example.com/avatar-2.jpg',
+        }, format='json')
+        selected = self.client.patch(
+            f"/api/v1/profiles/me/photos/{second_photo.data['id']}/",
+            {'is_primary': True},
+            format='json',
+        )
+        self.assertEqual(selected.status_code, 200)
+        self.assertEqual(User.objects.get(pk=self.user.pk).cover_image_url, 'https://example.com/cover.jpg')
+        public_profile = self.client.get(f'/api/v1/profiles/{self.user.id}/')
+        self.assertEqual(public_profile.data['avatar'], 'https://example.com/avatar-2.jpg')
+        self.assertEqual(public_profile.data['cover_image_url'], 'https://example.com/cover.jpg')
+        cleared_cover = self.client.patch('/api/v1/profiles/me/', {'cover_image_url': ''}, format='json')
+        self.assertEqual(cleared_cover.data['avatar'], 'https://example.com/avatar-2.jpg')
+        self.assertEqual(cleared_cover.data['cover_image_url'], '')
+
     def test_discover_applies_age_gender_search_and_excludes_self(self):
         response = self.client.get('/api/v1/discover/?q=coffee&gender=men&age_min=30&age_max=35')
         self.assertEqual(response.status_code, 200)
         self.assertEqual([profile['id'] for profile in response.data], [str(self.other.id)])
+
+    def test_explicit_everyone_filter_overrides_saved_gender_preferences(self):
+        self.user.preferences = {'interested_in': ['women']}
+        self.user.save(update_fields=('preferences',))
+
+        response = self.client.get('/api/v1/discover/?gender=Everyone')
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(str(self.other.id), [profile['id'] for profile in response.data])
 
     def test_discover_reports_shared_interests_and_supports_shared_only_filter(self):
         unrelated = User.objects.create_user(

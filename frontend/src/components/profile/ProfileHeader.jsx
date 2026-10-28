@@ -25,15 +25,15 @@ export default function ProfileHeader({ user, isOwnProfile = false, onEdit, onLi
         background: 'linear-gradient(135deg, var(--color-primary), var(--color-secondary))',
         position: 'relative'
       }}>
-        {profileUser.photos && profileUser.photos[0] && (
+        {profileUser.cover_image_url && (
           <img
-            src={profileUser.photos[0]}
+            src={profileUser.cover_image_url}
             alt="Cover"
-            style={{ width: '100%', height: '100%', objectFit: 'cover', opacity: 0.3 }}
+            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
           />
         )}
         {isOwnProfile && (
-          <button onClick={() => navigate('/profile/edit')} aria-label="Edit profile photos" style={{
+          <button onClick={() => navigate('/profile/edit')} aria-label="Edit cover picture" style={{
             position: 'absolute',
             top: '12px',
             right: '12px',

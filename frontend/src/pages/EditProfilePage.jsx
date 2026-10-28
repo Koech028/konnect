@@ -17,7 +17,7 @@ const fieldStyle = {
 }
 
 export default function EditProfilePage() {
-  const { user, updateUser } = useAuth()
+  const { user, updateUser, refreshUser } = useAuth()
   const navigate = useNavigate()
   const [form, setForm] = useState({
     display_name: user?.display_name || '',
@@ -28,8 +28,11 @@ export default function EditProfilePage() {
     interests: (user?.interests || []).join(', ')
   })
   const [photos, setPhotos] = useState(user?.photos || [])
+  const [profilePhoto, setProfilePhoto] = useState(user?.avatar || user?.photos?.[0] || '')
+  const [coverImage, setCoverImage] = useState(user?.cover_image_url || '')
   const [photoRecords, setPhotoRecords] = useState([])
   const [photoRecordsLoaded, setPhotoRecordsLoaded] = useState(false)
+  const [uploadingCover, setUploadingCover] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [error, setError] = useState('')
 
@@ -42,6 +45,21 @@ export default function EditProfilePage() {
 
   const change = (field, value) => setForm(current => ({ ...current, [field]: value }))
 
+  const changeCoverImage = async event => {
+    const file = event.target.files?.[0]
+    if (!file) return
+    setUploadingCover(true)
+    try {
+      setCoverImage(await uploadImage(file))
+      setError('')
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setUploadingCover(false)
+      event.target.value = ''
+    }
+  }
+
   const addPhoto = async (event) => {
     const file = event.target.files?.[0]
     if (!file) return
@@ -51,12 +69,20 @@ export default function EditProfilePage() {
       } else {
         const uploadedUrl = await uploadImage(file)
         setPhotos(current => [...current, uploadedUrl])
+        if (!profilePhoto) setProfilePhoto(uploadedUrl)
         setError('')
       }
     } catch (err) {
       setError(err.message)
     }
     event.target.value = ''
+  }
+
+  const removePhoto = index => {
+    const removed = photos[index]
+    const nextPhotos = photos.filter((_, photoIndex) => photoIndex !== index)
+    setPhotos(nextPhotos)
+    if (profilePhoto === removed) setProfilePhoto(nextPhotos[0] || '')
   }
 
   const save = async (event) => {
@@ -77,6 +103,7 @@ export default function EditProfilePage() {
         display_name: form.display_name.trim(),
         age,
         bio: form.bio.trim(),
+        cover_image_url: coverImage,
         location: { city: form.city.trim(), country: form.country.trim() },
         interests: form.interests.split(',').map(item => item.trim()).filter(Boolean),
       })
@@ -89,20 +116,20 @@ export default function EditProfilePage() {
       const remaining = photoRecords.filter(photo => retainedUrls.has(photo.url))
       const remainingUrls = new Set(remaining.map(photo => photo.url))
       let nextPosition = Math.max(-1, ...remaining.map(photo => photo.position)) + 1
-      for (const [index, url] of photos.entries()) {
+      for (const url of photos) {
         if (!remainingUrls.has(url)) {
           await api.post('/api/v1/profiles/me/photos/', {
             url,
             position: nextPosition++,
-            is_primary: remaining.length === 0 && index === 0
+            is_primary: url === profilePhoto
           })
         }
       }
-      const primary = photos[0]
-      const primaryRecord = remaining.find(photo => photo.url === primary)
+      const primaryRecord = remaining.find(photo => photo.url === profilePhoto)
       if (primaryRecord && !primaryRecord.is_primary) {
         await api.patch(`/api/v1/profiles/me/photos/${primaryRecord.id}/`, { is_primary: true })
       }
+      await refreshUser()
       setError('')
       navigate('/profile')
     } catch (err) {
@@ -117,14 +144,32 @@ export default function EditProfilePage() {
       <PageHeader title="Edit profile" />
       <form onSubmit={save} style={{ padding: 'var(--space-md)' }}>
         <section style={cardStyle}>
+          <h2 style={sectionTitleStyle}>Cover picture</h2>
+          <p style={helperStyle}>This wide image is separate from your profile picture and photo gallery.</p>
+          {coverImage && (
+            <div style={{ position: 'relative', height: 150, marginTop: 14, overflow: 'hidden', borderRadius: 'var(--radius-md)' }}>
+              <img src={coverImage} alt="Your cover picture" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              <button type="button" onClick={() => setCoverImage('')} aria-label="Remove cover picture" style={removeButtonStyle}><X size={15} /></button>
+            </div>
+          )}
+          <label style={{ ...addPhotoStyle, aspectRatio: 'auto', minHeight: 54, flexDirection: 'row', marginTop: 12, cursor: uploadingCover ? 'wait' : 'pointer' }}>
+            <Camera size={19} />
+            <span>{uploadingCover ? 'Uploading cover…' : coverImage ? 'Change cover picture' : 'Add cover picture'}</span>
+            <input type="file" accept="image/*" disabled={uploadingCover} onChange={changeCoverImage} style={{ position: 'absolute', width: 1, height: 1, opacity: 0 }} />
+          </label>
+        </section>
+
+        <section style={cardStyle}>
           <h2 style={sectionTitleStyle}>Your photos</h2>
-          <p style={helperStyle}>Your first photo is used as your profile picture. Up to 6 photos, 5 MB each before resizing.</p>
+          <p style={helperStyle}>Choose one photo as your profile picture. Your cover picture is managed separately. Up to 6 photos, 5 MB each before resizing.</p>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: '8px', marginTop: '14px' }}>
             {photos.map((photo, index) => (
               <div key={`${index}-${photo.slice(0, 24)}`} style={{ position: 'relative', aspectRatio: '1', borderRadius: 'var(--radius-md)', overflow: 'hidden', background: 'var(--color-border-light)' }}>
                 <img src={photo} alt={`Profile photo ${index + 1}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                {index === 0 && <span style={{ position: 'absolute', bottom: '5px', left: '5px', background: 'rgba(0,0,0,.6)', color: 'white', borderRadius: 'var(--radius-full)', padding: '3px 7px', fontSize: '10px' }}>Main</span>}
-                <button type="button" onClick={() => setPhotos(current => current.filter((_, photoIndex) => photoIndex !== index))} aria-label={`Remove photo ${index + 1}`} style={removeButtonStyle}><X size={15} /></button>
+                <button type="button" onClick={() => setProfilePhoto(photo)} aria-pressed={profilePhoto === photo} style={profilePictureButtonStyle}>
+                  {profilePhoto === photo ? 'Profile picture' : 'Set as profile picture'}
+                </button>
+                <button type="button" onClick={() => removePhoto(index)} aria-label={`Remove photo ${index + 1}`} style={removeButtonStyle}><X size={15} /></button>
               </div>
             ))}
             {photos.length < 6 && (
@@ -177,3 +222,4 @@ const labelStyle = { display: 'block', fontSize: '13px', fontWeight: 600, color:
 const saveButtonStyle = { width: '100%', padding: '14px', border: 'none', borderRadius: 'var(--radius-lg)', background: 'var(--color-primary)', color: 'white', font: 'inherit', fontWeight: 700, cursor: 'pointer' }
 const removeButtonStyle = { position: 'absolute', top: '5px', right: '5px', width: '28px', height: '28px', display: 'grid', placeItems: 'center', border: 'none', borderRadius: '50%', background: 'rgba(0,0,0,.65)', color: 'white', cursor: 'pointer' }
 const addPhotoStyle = { aspectRatio: '1', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '6px', position: 'relative', border: '1px dashed var(--color-border)', borderRadius: 'var(--radius-md)', color: 'var(--color-primary)', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }
+const profilePictureButtonStyle = { position: 'absolute', bottom: '5px', left: '5px', maxWidth: 'calc(100% - 10px)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', border: 0, borderRadius: 'var(--radius-full)', padding: '5px 8px', background: 'rgba(0,0,0,.65)', color: 'white', fontSize: '10px', cursor: 'pointer' }

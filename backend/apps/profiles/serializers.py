@@ -38,7 +38,7 @@ class ProfileUpdateSerializer(serializers.ModelSerializer):
         from apps.accounts.models import User
         model = User
         fields = (
-            'display_name', 'age', 'gender', 'bio', 'location',
+            'display_name', 'age', 'gender', 'bio', 'cover_image_url', 'location',
             'interests', 'preferences', 'profile_status',
         )
 

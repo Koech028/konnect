@@ -1,10 +1,12 @@
 import { useState } from 'react'
-import { useNavigate, Link } from 'react-router-dom'
+import { useNavigate, Link, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { Eye, EyeOff, Mail, Lock, User, Calendar, MapPin } from 'lucide-react'
 
 export default function SignupPage() {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const referralCode = searchParams.get('ref') || ''
   const { signup } = useAuth()
   const [step, setStep] = useState(1)
   const [showPassword, setShowPassword] = useState(false)
@@ -36,6 +38,7 @@ export default function SignupPage() {
       setError('')
       await signup(formData.email, formData.password, {
         ...formData,
+        referral_code: referralCode,
         interests: formData.interests.split(',').map(item => item.trim()).filter(Boolean)
       })
       navigate('/')

@@ -13,7 +13,7 @@ class UserSerializer(serializers.ModelSerializer):
         model = User
         fields = (
             'id', 'display_name', 'age', 'gender', 'bio', 'location',
-            'photos', 'avatar', 'interests', 'verification_status',
+            'photos', 'avatar', 'cover_image_url', 'interests', 'verification_status',
             'profile_status', 'subscription_tier',
         )
         read_only_fields = ('id', 'verification_status', 'profile_status', 'subscription_tier')
@@ -40,6 +40,7 @@ class UserSerializer(serializers.ModelSerializer):
 
 class RegistrationSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, validators=[validate_password])
+    referral_code = serializers.CharField(write_only=True, required=False, allow_blank=True, max_length=32)
     city = serializers.CharField(write_only=True, required=False, allow_blank=True)
     country = serializers.CharField(write_only=True, required=False, allow_blank=True)
     interests = serializers.ListField(
@@ -58,7 +59,7 @@ class RegistrationSerializer(serializers.ModelSerializer):
         model = User
         fields = (
             'email', 'password', 'display_name', 'age', 'gender',
-            'bio', 'city', 'country', 'location', 'interests',
+            'bio', 'city', 'country', 'location', 'interests', 'referral_code',
         )
 
     def validate_email(self, value):
@@ -71,6 +72,12 @@ class RegistrationSerializer(serializers.ModelSerializer):
         location = attrs.pop('location', {})
         attrs.setdefault('city', location.get('city', ''))
         attrs.setdefault('country', location.get('country', 'Kenya'))
+        referral_code = attrs.pop('referral_code', '').strip()
+        if referral_code:
+            referrer = User.objects.filter(referral_code__iexact=referral_code).first()
+            if not referrer:
+                raise serializers.ValidationError({'referral_code': 'This invitation link is invalid.'})
+            attrs['referred_by'] = referrer
         return attrs
 
     def create(self, validated_data):
