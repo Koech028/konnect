@@ -63,7 +63,15 @@ export default function SafetyPage() {
       <div style={{ padding: 'var(--space-md)' }}>
         <section style={cardStyle}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px', color: 'var(--color-primary)' }}><Shield size={22} /><h2 style={{ color: 'var(--color-text-primary)', fontSize: '17px' }}>Report a profile</h2></div>
-          <p style={helperStyle}>Reports are sent securely to the moderation team for review.</p>
+          <p style={helperStyle}>Reports are sent securely to the moderation team for review. If the issue is urgent or involves real-world risk, contact local authorities or emergency services.</p>
+          <div style={{ background: 'var(--color-primary-soft)', borderRadius: 'var(--radius-md)', padding: '12px 14px', marginBottom: '16px' }}>
+            <strong style={{ display: 'block', marginBottom: '8px', color: 'var(--color-text-primary)' }}>What happens after you report or block?</strong>
+            <ul style={{ margin: 0, paddingLeft: '18px', color: 'var(--color-text-secondary)', lineHeight: 1.6, fontSize: '13px' }}>
+              <li>We review the report and may review the account, post, or message.</li>
+              <li>Blocking removes the person from your current interactions and hides them from discovery or message activity.</li>
+              <li>You will see the result in this screen and can retry if the action fails.</li>
+            </ul>
+          </div>
           <form onSubmit={submitReport}>
             <label htmlFor="report-user" style={labelStyle}>Profile</label>
             <select id="report-user" value={userId} onChange={event => setUserId(event.target.value)} style={fieldStyle}>
@@ -96,6 +104,13 @@ export default function SafetyPage() {
         </section>
 
         <section style={cardStyle}>
+          <h2 style={{ fontSize: '17px', marginBottom: '10px' }}>Safety guide</h2>
+          <ul style={{ margin: '0 0 12px', paddingLeft: '18px', color: 'var(--color-text-secondary)', lineHeight: 1.7, fontSize: '13px' }}>
+            <li>Keep your personal details private until you feel comfortable sharing them.</li>
+            <li>Block or report anyone who pressures you, sends unwanted messages, or appears deceptive.</li>
+            <li>Do not send money, personal documents, or verification codes to anyone on the app.</li>
+            <li>If something feels unsafe or suspicious, contact support and consider pausing communication.</li>
+          </ul>
           <h2 style={{ fontSize: '17px', marginBottom: '10px' }}>Your reports</h2>
           {!reports.length && <p style={helperStyle}>No reports submitted.</p>}
           {reports.map(report => (
@@ -105,7 +120,7 @@ export default function SafetyPage() {
             </div>
           ))}
         </section>
-        <p style={helperStyle}>For urgent or real-world danger, contact local emergency services. Blocked profiles are hidden from discovery and messaging.</p>
+        <p style={helperStyle}>Blocked profiles are hidden from discovery and messaging. Reports are reviewed and kept private to the moderation process.</p>
         <Link to="/settings" style={{ color: 'var(--color-primary)', fontWeight: 600, textDecoration: 'none' }}>Back to settings</Link>
         {message && <p role="status" style={{ color: 'var(--color-success)', fontSize: '13px', marginTop: '10px' }}>{message}</p>}
         {error && <p role="alert" style={{ color: 'var(--color-error)', fontSize: '13px', marginTop: '10px' }}>{error}</p>}

@@ -1,13 +1,16 @@
 import { useState, useRef, useEffect } from 'react'
-import { Send, ArrowLeft } from 'lucide-react'
+import { Send, ArrowLeft, ShieldAlert } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import MessageBubble from './MessageBubble'
 import Avatar from '../common/Avatar'
+import { useAppData } from '../../context/AppDataContext'
 
 export default function MessageThread({ match, messages, currentUserId, currentUserInterests = [], suggestedMessage = '', otherUserTyping, onTyping, onSendMessage }) {
   const [newMessage, setNewMessage] = useState('')
+  const [safetyError, setSafetyError] = useState('')
   const messagesEndRef = useRef(null)
   const navigate = useNavigate()
+  const { setBlocked } = useAppData()
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -47,6 +50,23 @@ export default function MessageThread({ match, messages, currentUserId, currentU
     }
   }
 
+  const handleSafetyAction = async (action) => {
+    if (action === 'block') {
+      const confirmed = window.confirm(`Block ${match.user.display_name}? They will no longer be able to match or message you.`)
+      if (!confirmed) return
+      try {
+        await setBlocked(match.user.id, true)
+        setSafetyError('')
+        navigate('/messages')
+      } catch (err) {
+        setSafetyError(err.message || 'This profile could not be blocked right now.')
+      }
+      return
+    }
+
+    navigate(`/safety?userId=${encodeURIComponent(match.user.id)}`)
+  }
+
   return (
     <div style={{
       display: 'flex',
@@ -77,7 +97,7 @@ export default function MessageThread({ match, messages, currentUserId, currentU
           <ArrowLeft size={22} />
         </button>
         <Avatar src={match.user.avatar} alt={match.user.display_name} size="sm" />
-        <div>
+        <div style={{ flex: 1 }}>
           <h3 style={{
             fontSize: '16px',
             fontWeight: 600,
@@ -92,6 +112,14 @@ export default function MessageThread({ match, messages, currentUserId, currentU
             Matched
           </span>
         </div>
+        <button
+          type="button"
+          onClick={() => handleSafetyAction('report')}
+          style={headerSafetyButtonStyle}
+        >
+          <ShieldAlert size={14} />
+          Safety
+        </button>
       </div>
 
       {/* Messages */}
@@ -178,10 +206,12 @@ export default function MessageThread({ match, messages, currentUserId, currentU
         </button>
       </form>
       {error && <p role="alert" style={{ padding: '0 16px 8px', color: 'var(--color-error)', fontSize: 13 }}>{error}</p>}
+      {safetyError && <p role="alert" style={{ padding: '0 16px 8px', color: 'var(--color-error)', fontSize: 13 }}>{safetyError}</p>}
     </div>
   )
 }
 
+const headerSafetyButtonStyle = { display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 12px', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-full)', background: 'var(--color-bg)', color: 'var(--color-text-secondary)', fontSize: '12px', fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font-sans)' }
 const starterSectionStyle = { padding: 'var(--space-md)', margin: '0 var(--space-md) var(--space-md)', borderRadius: 'var(--radius-lg)', background: 'var(--color-surface)', boxShadow: 'var(--shadow-sm)' }
 const starterTitleStyle = { margin: '0 0 8px', fontSize: 14, fontWeight: 700, color: 'var(--color-text-primary)' }
 const starterListStyle = { display: 'flex', flexWrap: 'wrap', gap: 8 }
