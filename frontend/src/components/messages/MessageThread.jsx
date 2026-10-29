@@ -8,6 +8,7 @@ import { useAppData } from '../../context/AppDataContext'
 export default function MessageThread({ match, messages, currentUserId, currentUserInterests = [], suggestedMessage = '', otherUserTyping, onTyping, onSendMessage }) {
   const [newMessage, setNewMessage] = useState('')
   const [safetyError, setSafetyError] = useState('')
+  const [muted, setMuted] = useState(false)
   const messagesEndRef = useRef(null)
   const navigate = useNavigate()
   const { setBlocked } = useAppData()
@@ -112,14 +113,23 @@ export default function MessageThread({ match, messages, currentUserId, currentU
             Matched
           </span>
         </div>
-        <button
-          type="button"
-          onClick={() => handleSafetyAction('report')}
-          style={headerSafetyButtonStyle}
-        >
-          <ShieldAlert size={14} />
-          Safety
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <button
+            type="button"
+            onClick={() => setMuted(value => !value)}
+            style={{ ...headerSafetyButtonStyle, background: muted ? 'var(--color-primary-soft)' : 'var(--color-bg)', color: muted ? 'var(--color-primary)' : 'var(--color-text-secondary)' }}
+          >
+            {muted ? 'Muted' : 'Mute'}
+          </button>
+          <button
+            type="button"
+            onClick={() => handleSafetyAction('report')}
+            style={headerSafetyButtonStyle}
+          >
+            <ShieldAlert size={14} />
+            Safety
+          </button>
+        </div>
       </div>
 
       {/* Messages */}
@@ -140,6 +150,9 @@ export default function MessageThread({ match, messages, currentUserId, currentU
               ))}
             </div>
             <p style={starterPrivacyStyle}>Choose one to edit it before sending. Nothing is sent automatically.</p>
+            <p style={{ margin: '10px 0 0', color: 'var(--color-text-secondary)', fontSize: 12 }}>
+              {muted ? 'This conversation is muted. You can still reply when you are ready.' : 'No messages yet — start with a prompt or send your own opener.'}
+            </p>
           </section>
         )}
         {messages?.map(message => (
