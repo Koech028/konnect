@@ -109,17 +109,21 @@ export default function ProfileHeader({ user, isOwnProfile = false, onEdit, onLi
               {liked ? 'Liked' : 'Like Profile'}
             </button>
             <button onClick={onSafety} aria-label="Report or block this profile" style={{
-              padding: '10px',
-              borderRadius: '50%',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '10px 14px',
+              borderRadius: 'var(--radius-full)',
               border: '1.5px solid var(--color-border)',
               background: 'var(--color-surface)',
               color: 'var(--color-text-secondary)',
               cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center'
+              fontSize: '13px',
+              fontWeight: 600,
+              fontFamily: 'var(--font-sans)'
             }}>
-              <Flag size={18} />
+              <Flag size={16} />
+              Safety
             </button>
           </div>
         )}

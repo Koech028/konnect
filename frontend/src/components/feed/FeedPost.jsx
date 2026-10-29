@@ -186,6 +186,27 @@ export default function FeedPost({ post, onLike, onShare, onInterest, onPollVote
             <span>{formatRelativeTime(post.created_at)}</span>
           </div>
         </div>
+        <button
+          type="button"
+          onClick={() => navigate(`/safety?userId=${encodeURIComponent(post.author.id)}`)}
+          aria-label={`Report or block ${post.author.display_name}`}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '4px',
+            padding: '8px 10px',
+            border: '1px solid var(--color-border)',
+            borderRadius: 'var(--radius-full)',
+            background: 'var(--color-bg)',
+            color: 'var(--color-text-secondary)',
+            fontSize: '12px',
+            fontWeight: 600,
+            fontFamily: 'var(--font-sans)',
+            cursor: 'pointer'
+          }}
+        >
+          Safety
+        </button>
       </div>
 
       {/* Content */}
