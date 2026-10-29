@@ -1,11 +1,15 @@
 from rest_framework.test import APITestCase
 from django.contrib.auth.tokens import default_token_generator
+from django.core.cache import cache
 from django.utils.http import urlsafe_base64_encode
 
 from apps.accounts.models import User
 
 
 class AccountApiTests(APITestCase):
+    def setUp(self):
+        cache.clear()
+
     def test_register_login_and_current_profile(self):
         response = self.client.post('/api/v1/auth/register/', {
             'email': 'new-member@example.com',
@@ -152,6 +156,20 @@ class AccountApiTests(APITestCase):
 
         self.assertEqual(response.status_code, 400)
         self.assertFalse(User.objects.filter(email='underage@example.com').exists())
+
+    def test_registration_does_not_require_optional_profile_details(self):
+        response = self.client.post('/api/v1/auth/register/', {
+            'email': 'minimal-member@example.com',
+            'password': 'Mango!Sunrise_2026',
+            'display_name': 'Minimal Member',
+            'age': 26,
+            'gender': 'woman',
+        }, format='json')
+
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.data['user']['location']['city'], '')
+        self.assertEqual(response.data['user']['bio'], '')
+        self.assertEqual(response.data['user']['interests'], [])
 
     def test_password_reset_request_does_not_reveal_account_existence(self):
         user = User.objects.create_user(

@@ -287,7 +287,7 @@ export default function SignupPage() {
                 color: 'var(--color-text-secondary)',
                 marginBottom: '8px'
               }}>
-                Location
+                Location (optional)
               </label>
               <div style={{
                 display: 'flex',
@@ -304,7 +304,6 @@ export default function SignupPage() {
                   value={formData.location.city}
                   onChange={(e) => handleChange('location', { ...formData.location, city: e.target.value })}
                   placeholder="City"
-                  required
                   style={{
                     flex: 1,
                     border: 'none',
@@ -338,7 +337,7 @@ export default function SignupPage() {
                 textAlign: 'center',
                 marginTop: '4px'
               }}>
-                Create your account to start meeting people in {formData.location.city}
+                Create your account to start meeting people. You can add your city later.
               </p>
             </div>
           </>
@@ -355,7 +354,7 @@ export default function SignupPage() {
                 color: 'var(--color-text-secondary)',
                 marginBottom: '8px'
               }}>
-                A little about you
+                A little about you (optional)
               </label>
               <textarea
                 id="signup-bio"
@@ -385,7 +384,7 @@ export default function SignupPage() {
                 color: 'var(--color-text-secondary)',
                 marginBottom: '8px'
               }}>
-                Interests (comma separated)
+                Interests (optional, comma separated)
               </label>
               <input
                 id="signup-interests"
