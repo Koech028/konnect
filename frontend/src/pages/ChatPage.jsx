@@ -11,6 +11,7 @@ export default function ChatPage() {
   const [messages, setMessages] = useState([])
   const [match, setMatch] = useState(null)
   const [error, setError] = useState('')
+  const [matchMissing, setMatchMissing] = useState(false)
   const [otherUserTyping, setOtherUserTyping] = useState(false)
   const lastTypingUpdate = useRef(0)
   const typingTimeout = useRef(null)
@@ -25,6 +26,7 @@ export default function ChatPage() {
       matchLoaded.current = false
       setMessages([])
       setMatch(null)
+      setMatchMissing(false)
     }
     const cursor = latestMessageAt.current
     const messagePath = `/api/v1/matches/${matchId}/messages/${cursor ? `?after=${encodeURIComponent(cursor)}` : ''}`
@@ -35,8 +37,13 @@ export default function ChatPage() {
     ])
     if (matchResponse) {
       const matches = matchResponse.results || matchResponse
-      setMatch(matches.find(item => item.id === matchId) || null)
+      const foundMatch = matches.find(item => item.id === matchId) || null
+      setMatch(foundMatch)
+      setMatchMissing(!foundMatch)
       matchLoaded.current = true
+    }
+    if (!matchResponse && !match) {
+      setMatchMissing(false)
     }
     for (const message of messageResponse) {
       if (!latestMessageAt.current || message.created_at > latestMessageAt.current) {
@@ -52,6 +59,7 @@ export default function ChatPage() {
       ]
     })
     setOtherUserTyping(activity.other_user_typing)
+    setError('')
   }, [matchId, user?.id])
 
   useEffect(() => {
@@ -79,6 +87,7 @@ export default function ChatPage() {
   }, [loadConversation])
 
   const handleTyping = () => {
+    if (!matchId) return
     const now = Date.now()
     if (now - lastTypingUpdate.current < 2000) return
     lastTypingUpdate.current = now
@@ -99,6 +108,16 @@ export default function ChatPage() {
     lastTypingUpdate.current = 0
     api.post(`/api/v1/matches/${matchId}/messages/activity/`, { typing: false })
       .catch(err => console.error('Could not clear typing status:', err))
+  }
+
+  if (matchMissing) {
+    return (
+      <div style={{ padding: 'var(--space-xl)', textAlign: 'center', color: 'var(--color-text-secondary)' }}>
+        <h2 style={{ margin: '0 0 10px', color: 'var(--color-text-primary)' }}>This match is no longer available.</h2>
+        <p style={{ margin: '0 0 16px' }}>You can still view your other conversations or keep exploring new matches.</p>
+        <a href="/messages" style={{ color: 'var(--color-primary)', fontWeight: 600, textDecoration: 'none' }}>Return to messages</a>
+      </div>
+    )
   }
 
   if (error) return <div role="alert" style={{ padding: 'var(--space-xl)' }}>{error}</div>

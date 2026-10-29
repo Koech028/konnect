@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { api } from '../utils/api'
 import MatchList from '../components/messages/MatchList'
 
@@ -35,7 +36,12 @@ export default function MessagesPage() {
         </p>
       </div>
       {error && <p role="alert" style={{ padding: 'var(--space-md)', color: 'var(--color-error)' }}>{error}</p>}
-      {!error && matches.length === 0 && <p style={{ padding: 'var(--space-md)', color: 'var(--color-text-secondary)' }}>Your mutual matches will appear here.</p>}
+      {!error && matches.length === 0 && (
+        <div style={{ padding: 'var(--space-md)', color: 'var(--color-text-secondary)' }}>
+          <p style={{ margin: '0 0 12px' }}>Your mutual matches will appear here.</p>
+          <Link to="/discover" style={{ color: 'var(--color-primary)', fontWeight: 600, textDecoration: 'none' }}>Start matching</Link>
+        </div>
+      )}
       <MatchList matches={matches} />
     </div>
   )
