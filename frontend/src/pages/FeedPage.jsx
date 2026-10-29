@@ -6,11 +6,12 @@ import DailyPromptCard from '../components/feed/DailyPromptCard'
 import StoriesBar from '../components/feed/StoriesBar'
 import { useAppData } from '../context/AppDataContext'
 import { useAuth } from '../context/AuthContext'
+import ProfileCompletionCard from '../components/profile/ProfileCompletionCard'
 
 export default function FeedPage() {
   const [activeFilter, setActiveFilter] = useState('all')
   const { user } = useAuth()
-  const { posts, togglePostLike, togglePostInterest, votePoll, isLoadingPosts, postsError } = useAppData()
+  const { posts, likedUserIds, isLoadingRelationships, togglePostLike, togglePostInterest, votePoll, isLoadingPosts, postsError } = useAppData()
   const visiblePosts = useMemo(() => {
     if (activeFilter === 'trending') {
       return [...posts].sort((a, b) => (b.engagement?.likes_count || 0) - (a.engagement?.likes_count || 0))
@@ -24,6 +25,7 @@ export default function FeedPage() {
 
   return (
     <div style={{ padding: 'var(--space-md)' }}>
+      <ProfileCompletionCard user={user} likedUserIds={likedUserIds} isLoadingRelationships={isLoadingRelationships} />
       <StoriesBar />
       <DailyPromptCard />
       <Link to="/shorts" style={shortsLinkStyle}>

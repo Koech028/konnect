@@ -11,6 +11,7 @@ export function AppDataProvider({ children }) {
   const [blockedProfiles, setBlockedProfiles] = useState([])
   const [reports, setReports] = useState([])
   const [isLoadingPosts, setIsLoadingPosts] = useState(false)
+  const [isLoadingRelationships, setIsLoadingRelationships] = useState(true)
   const [postsError, setPostsError] = useState('')
   const [relationshipsError, setRelationshipsError] = useState('')
 
@@ -41,8 +42,10 @@ export function AppDataProvider({ children }) {
       setBlockedProfiles([])
       setReports([])
       setRelationshipsError('')
+      setIsLoadingRelationships(false)
       return
     }
+    setIsLoadingRelationships(true)
     try {
       const [liked, blocked, submittedReports] = await Promise.all([
         api.get('/api/v1/likes/outgoing/'),
@@ -56,6 +59,8 @@ export function AppDataProvider({ children }) {
     } catch (error) {
       setRelationshipsError(error.message || 'Account activity could not be loaded.')
       throw error
+    } finally {
+      setIsLoadingRelationships(false)
     }
   }, [user])
 
@@ -67,8 +72,10 @@ export function AppDataProvider({ children }) {
       setBlockedProfiles([])
       setReports([])
       setRelationshipsError('')
+      setIsLoadingRelationships(false)
       return
     }
+    setIsLoadingRelationships(true)
     refreshPosts().catch(error => console.error('Could not load posts:', error))
     refreshRelationships().catch(error => console.error('Could not load account data:', error))
   }, [user, refreshPosts, refreshRelationships])
@@ -185,6 +192,7 @@ export function AppDataProvider({ children }) {
   const value = useMemo(() => ({
     posts,
     likedUserIds,
+    isLoadingRelationships,
     blockedProfiles,
     blockedUserIds: blockedProfiles.map(item => item.user.id),
     reports,
@@ -209,7 +217,7 @@ export function AppDataProvider({ children }) {
     getProfile,
     getPostsByAuthor
   }), [
-    posts, likedUserIds, blockedProfiles, reports, isLoadingPosts, postsError,
+    posts, likedUserIds, isLoadingRelationships, blockedProfiles, reports, isLoadingPosts, postsError,
     relationshipsError, refreshPosts,
     refreshRelationships, createPost, updatePost, deletePost, togglePostLike,
     togglePostInterest, votePoll, toggleUserLike, setBlocked, addReport, addComment, getComments, getPost,
