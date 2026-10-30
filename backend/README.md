@@ -219,6 +219,19 @@ Profile responses contain the UI's `location: {city, country}`, `photos` URL lis
 * Email reset delivery uses the console backend locally. Configure and test real delivery before production.
 * Rate limits and JWT authentication are enabled, but production still needs HTTPS, a production database, secret management, backups, monitoring, and deployment hardening.
 
+## Data handling, retention, support, and account deletion
+
+This is an implementation inventory, not an approved retention policy or legal advice. Retention periods, deletion commitments, and support ownership still need product and qualified legal review before launch.
+
+* Account and profile records include email, display name, age, gender, city/country, bio, interests, discovery preferences, visibility, referral attribution, verification status, and activity timestamps. Public profile responses omit account email, private preferences, and activity timestamps. These records are stored in the application database.
+* Matches, messages, posts, comments, likes, event RSVPs, prompt answers, notifications, blocks, and reports are database records associated with accounts. Daily prompts are private to the responding account. Reports are available to the reporting user in the Safety Center; a dedicated staff moderation workflow is not yet implemented.
+* Media bytes are uploaded directly to Cloudflare R2. The database stores media URLs; R2 object keys include the owning account UUID and a random identifier. Removing a profile-photo or post record does not delete its R2 object. Story expiry currently hides stories from active listings after 24 hours; it does not automatically delete the database row or media object.
+* The application has no user-facing account deletion endpoint or configured support contact. Settings currently says account deletion is unavailable. Do not promise self-service deletion or direct users to the example VAPID sender email as support.
+* Most account-related database rows use cascading deletion, referral attribution is nulled when a referrer is deleted, and creator-earning records use protected relations that can prevent account deletion. Deleting a database row would not by itself remove R2 objects or establish when data expires from provider backups.
+* The application defines no general retention periods or scheduled cleanup for account records, messages, reports, expired stories, or orphaned media. Hosting-provider backup retention is configured outside this application and must be documented separately.
+
+Before registration opens, assign a real support owner and contact channel; approve retention periods and deletion-request handling; define which safety, abuse, and accounting records may need restricted retention; implement and test account deletion or deactivation semantics; remove associated R2 objects safely; and document backup expiry and restore handling. Do not manually delete production accounts until the policy accounts for protected financial records, investigations, and recovery requirements.
+
 ## Checks and tests
 
 ```powershell

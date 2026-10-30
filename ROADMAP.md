@@ -56,7 +56,7 @@ Complete these items in order.
 
 ### 5. Production and launch readiness
 
-- [ ] Review account, profile, referral, and media data handling; document retention, user support, and account deletion expectations.
+- [x] Review account, profile, referral, and media data handling; document retention, user support, and account deletion expectations. Review documented in `backend/README.md` on 2026-10-30; retention periods, real support contact, deletion workflow, and R2 cleanup remain launch blockers pending owner and qualified legal review.
 - [ ] Confirm deployed secrets, HTTPS, database backups and restore procedure, monitoring, error reporting, and operational ownership.
 - [ ] Test email delivery, password reset, upload permissions, rate limits, and database migration procedure in the deployment environment.
 - [ ] Resolve launch-blocking defects and verify the core user journeys on supported mobile and desktop browsers.
