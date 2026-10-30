@@ -74,6 +74,9 @@ class ProfileApiTests(APITestCase):
         public_profile = self.client.get(f'/api/v1/profiles/{self.user.id}/')
         self.assertEqual(public_profile.data['avatar'], 'https://example.com/avatar-2.jpg')
         self.assertEqual(public_profile.data['cover_image_url'], 'https://example.com/cover.jpg')
+        self.assertNotIn('email', public_profile.data)
+        self.assertNotIn('preferences', public_profile.data)
+        self.assertNotIn('last_active', public_profile.data)
         cleared_cover = self.client.patch('/api/v1/profiles/me/', {'cover_image_url': ''}, format='json')
         self.assertEqual(cleared_cover.data['avatar'], 'https://example.com/avatar-2.jpg')
         self.assertEqual(cleared_cover.data['cover_image_url'], '')
@@ -82,6 +85,16 @@ class ProfileApiTests(APITestCase):
         response = self.client.get('/api/v1/discover/?q=coffee&gender=men&age_min=30&age_max=35')
         self.assertEqual(response.status_code, 200)
         self.assertEqual([profile['id'] for profile in response.data], [str(self.other.id)])
+
+    def test_hidden_profile_is_excluded_from_discovery_and_public_reads(self):
+        self.other.profile_status = User.ProfileStatus.HIDDEN
+        self.other.save(update_fields=('profile_status',))
+
+        discovery = self.client.get('/api/v1/discover/')
+        public_profile = self.client.get(f'/api/v1/profiles/{self.other.id}/')
+
+        self.assertNotIn(str(self.other.id), [profile['id'] for profile in discovery.data])
+        self.assertEqual(public_profile.status_code, 404)
 
     def test_explicit_everyone_filter_overrides_saved_gender_preferences(self):
         self.user.preferences = {'interested_in': ['women']}

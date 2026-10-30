@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useSearchParams, Link } from 'react-router-dom'
+import { useSearchParams, Link, useLocation } from 'react-router-dom'
 import { Shield, UserRoundX, Flag } from 'lucide-react'
 import PageHeader from '../components/common/PageHeader'
 import { useAppData } from '../context/AppDataContext'
@@ -15,11 +15,12 @@ const reasons = [
 
 export default function SafetyPage() {
   const [searchParams] = useSearchParams()
+  const location = useLocation()
   const initialUserId = searchParams.get('userId') || ''
   const [userId, setUserId] = useState(initialUserId)
   const [reason, setReason] = useState(reasons[0][0])
   const [details, setDetails] = useState('')
-  const [message, setMessage] = useState('')
+  const [message, setMessage] = useState(location.state?.safetyMessage || '')
   const [error, setError] = useState('')
   const { blockedProfiles, reports, relationshipsError, setBlocked, addReport, searchProfiles } = useAppData()
   const [profiles, setProfiles] = useState([])
@@ -109,7 +110,7 @@ export default function SafetyPage() {
             <li>Keep your personal details private until you feel comfortable sharing them.</li>
             <li>Block or report anyone who pressures you, sends unwanted messages, or appears deceptive.</li>
             <li>Do not send money, personal documents, or verification codes to anyone on the app.</li>
-            <li>If something feels unsafe or suspicious, contact support and consider pausing communication.</li>
+            <li>If something feels unsafe or suspicious, submit a report from this Safety Center and consider pausing communication.</li>
           </ul>
           <h2 style={{ fontSize: '17px', marginBottom: '10px' }}>Your reports</h2>
           {!reports.length && <p style={helperStyle}>No reports submitted.</p>}

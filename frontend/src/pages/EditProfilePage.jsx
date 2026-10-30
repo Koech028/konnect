@@ -143,6 +143,10 @@ export default function EditProfilePage() {
     <>
       <PageHeader title="Edit profile" />
       <form onSubmit={save} style={{ padding: 'var(--space-md)' }}>
+        <p style={visibilityNoteStyle}>
+          Your profile details and photos may be shown to other members while your profile is visible.{' '}
+          <button type="button" onClick={() => navigate('/settings')} style={visibilityLinkStyle}>Manage visibility in Settings</button>
+        </p>
         <section style={cardStyle}>
           <h2 style={sectionTitleStyle}>Cover picture</h2>
           <p style={helperStyle}>This wide image is separate from your profile picture and photo gallery.</p>
@@ -218,6 +222,8 @@ function Field({ label, value, onChange, type = 'text', ...props }) {
 const cardStyle = { background: 'var(--color-surface)', borderRadius: 'var(--radius-lg)', padding: 'var(--space-lg)', boxShadow: 'var(--shadow-sm)', marginBottom: 'var(--space-md)' }
 const sectionTitleStyle = { fontSize: '17px', fontWeight: 700, marginBottom: '6px' }
 const helperStyle = { fontSize: '13px', color: 'var(--color-text-secondary)' }
+const visibilityNoteStyle = { margin: '0 4px 14px', color: 'var(--color-text-secondary)', fontSize: 13, lineHeight: 1.5 }
+const visibilityLinkStyle = { padding: 0, border: 0, background: 'none', color: 'var(--color-primary)', font: 'inherit', fontWeight: 600, textDecoration: 'underline', cursor: 'pointer' }
 const labelStyle = { display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--color-text-secondary)', margin: '12px 0 6px' }
 const saveButtonStyle = { width: '100%', padding: '14px', border: 'none', borderRadius: 'var(--radius-lg)', background: 'var(--color-primary)', color: 'white', font: 'inherit', fontWeight: 700, cursor: 'pointer' }
 const removeButtonStyle = { position: 'absolute', top: '5px', right: '5px', width: '28px', height: '28px', display: 'grid', placeItems: 'center', border: 'none', borderRadius: '50%', background: 'rgba(0,0,0,.65)', color: 'white', cursor: 'pointer' }

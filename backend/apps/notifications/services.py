@@ -19,6 +19,10 @@ def create_notification(*, recipient, actor, notification_type, body, target_typ
         preferences = NotificationPreference.objects.filter(user=recipient).first()
         if preferences and not getattr(preferences, preference_field):
             return None
+    if notification_type == 'message' and target_type == 'match' and target_id:
+        from apps.messaging.models import MessageActivity
+        if MessageActivity.objects.filter(match_id=target_id, user=recipient, muted=True).exists():
+            return None
     notification = Notification.objects.create(
         recipient=recipient,
         actor=actor,

@@ -13,6 +13,7 @@ export default function ChatPage() {
   const [error, setError] = useState('')
   const [matchMissing, setMatchMissing] = useState(false)
   const [otherUserTyping, setOtherUserTyping] = useState(false)
+  const [muted, setMuted] = useState(false)
   const lastTypingUpdate = useRef(0)
   const typingTimeout = useRef(null)
   const latestMessageAt = useRef(null)
@@ -30,20 +31,35 @@ export default function ChatPage() {
     }
     const cursor = latestMessageAt.current
     const messagePath = `/api/v1/matches/${matchId}/messages/${cursor ? `?after=${encodeURIComponent(cursor)}` : ''}`
-    const [matchResponse, messageResponse, activity] = await Promise.all([
-      matchLoaded.current ? Promise.resolve(null) : api.get('/api/v1/matches/'),
-      api.get(messagePath),
-      api.get(`/api/v1/matches/${matchId}/messages/activity/`)
-    ])
-    if (matchResponse) {
-      const matches = matchResponse.results || matchResponse
-      const foundMatch = matches.find(item => item.id === matchId) || null
-      setMatch(foundMatch)
-      setMatchMissing(!foundMatch)
-      matchLoaded.current = true
+    if (!matchLoaded.current) {
+      try {
+        const foundMatch = await api.get(`/api/v1/matches/${matchId}/`)
+        setMatch(foundMatch)
+        setMatchMissing(false)
+        matchLoaded.current = true
+      } catch (err) {
+        if (err.status === 404) {
+          setMatchMissing(true)
+          setError('')
+          return
+        }
+        throw err
+      }
     }
-    if (!matchResponse && !match) {
-      setMatchMissing(false)
+    let messageResponse
+    let activity
+    try {
+      [messageResponse, activity] = await Promise.all([
+        api.get(messagePath),
+        api.get(`/api/v1/matches/${matchId}/messages/activity/`)
+      ])
+    } catch (err) {
+      if (err.status === 403 || err.status === 404) {
+        setMatchMissing(true)
+        setError('')
+        return
+      }
+      throw err
     }
     for (const message of messageResponse) {
       if (!latestMessageAt.current || message.created_at > latestMessageAt.current) {
@@ -59,6 +75,7 @@ export default function ChatPage() {
       ]
     })
     setOtherUserTyping(activity.other_user_typing)
+    setMuted(activity.is_muted)
     setError('')
   }, [matchId, user?.id])
 
@@ -110,6 +127,11 @@ export default function ChatPage() {
       .catch(err => console.error('Could not clear typing status:', err))
   }
 
+  const handleMute = async nextMuted => {
+    const activity = await api.post(`/api/v1/matches/${matchId}/messages/activity/`, { muted: nextMuted })
+    setMuted(activity.is_muted)
+  }
+
   if (matchMissing) {
     return (
       <div style={{ padding: 'var(--space-xl)', textAlign: 'center', color: 'var(--color-text-secondary)' }}>
@@ -120,21 +142,26 @@ export default function ChatPage() {
     )
   }
 
-  if (error) return <div role="alert" style={{ padding: 'var(--space-xl)' }}>{error}</div>
+  if (error && !match) return <div role="alert" style={{ padding: 'var(--space-xl)' }}>{error}</div>
   if (!match) {
     return <div role="status" style={{ padding: 'var(--space-xl)', textAlign: 'center' }}>Loading conversation...</div>
   }
 
   return (
-    <MessageThread
-      match={match}
-      messages={messages}
-      currentUserId={user?.id}
-      currentUserInterests={user?.interests || []}
-      suggestedMessage={location.state?.suggestedMessage || ''}
-      otherUserTyping={otherUserTyping}
-      onTyping={handleTyping}
-      onSendMessage={handleSendMessage}
-    />
+    <>
+      {error && <p role="alert" style={{ margin: 0, padding: '8px 16px', color: 'var(--color-error)', fontSize: 13 }}>Could not refresh this conversation. Your loaded messages are still available; retrying automatically. ({error})</p>}
+      <MessageThread
+        match={match}
+        messages={messages}
+        currentUserId={user?.id}
+        currentUserInterests={user?.interests || []}
+        suggestedMessage={location.state?.suggestedMessage || ''}
+        otherUserTyping={otherUserTyping}
+        muted={muted}
+        onMute={handleMute}
+        onTyping={handleTyping}
+        onSendMessage={handleSendMessage}
+      />
+    </>
   )
 }

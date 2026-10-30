@@ -1,5 +1,7 @@
 # LinkUp Product Roadmap
 
+**Target hosting date:** 2026-11-20.
+
 This roadmap is the working checklist for the next product stages. Work through **Core Required** in order; only start **Advanced** after every core item is complete and verified. When an item is finished, update its checkbox and completion note, then move to the next item.
 
 ## How to use this roadmap
@@ -25,27 +27,27 @@ Complete these items in order.
 
 ### 2. Trust, safety, and privacy experience
 
-- [ ] Make block and report actions easy to find on profiles, messages, posts, and live experiences where applicable.
-- [ ] Explain what happens after blocking or reporting, confirm successful actions, and show useful error/retry states.
-- [ ] Add a concise safety guide covering privacy, unwanted contact, suspicious requests, and how to get help.
-- [ ] Review profile visibility, notification controls, and user-facing profile data so members can understand and change what is visible.
-- [ ] Test that blocks consistently prevent or hide relevant profile, matching, messaging, and live interactions.
+- [x] Make block and report actions easy to find on profiles, messages, posts, and live experiences where applicable. Completed 2026-10-30: added explicit conversation and live-room actions, confirmed block outcomes in the Safety Center, and verified blocked match, message, typing, and live-join behavior.
+- [x] Explain what happens after blocking or reporting, confirm successful actions, and show useful error/retry states. Completed 2026-10-30: report/block confirmations and errors are visible in the Safety Center; message and live blocks return there with success feedback.
+- [x] Add a concise safety guide covering privacy, unwanted contact, suspicious requests, and how to get help. Completed 2026-10-30: guide directs members to submit an in-app report and separates urgent real-world risks to local emergency services.
+- [x] Review profile visibility, notification controls, and user-facing profile data so members can understand and change what is visible. Completed 2026-10-30: added profile visibility disclosure, confirmed hidden profiles are excluded from Discovery/public reads, verified private account fields stay out of public profiles, and tested notification preference persistence.
+- [x] Test that blocks consistently prevent or hide relevant profile, matching, messaging, and live interactions. Completed 2026-10-30: verified block behavior across profile visibility, likes/matches, message reads/sends/activity, and live listings/joins with focused regression tests.
 
 **Done when:** users can find and use safety controls, understand their effect, and tests verify blocked interactions are consistently unavailable.
 
 ### 3. Better post-match conversations
 
-- [ ] Review the existing shared-interest icebreakers and ensure suggestions are optional, editable drafts—not sent automatically.
-- [ ] Make it easy to start or resume a conversation after a match.
-- [ ] Ensure mute, block, and report actions are understandable and accessible from the conversation.
-- [ ] Improve conversation empty, loading, failure, and no-longer-matched states.
+- [x] Review the existing shared-interest icebreakers and ensure suggestions are optional, editable drafts—not sent automatically. Completed 2026-10-30: prompts fill an editable draft and require the member to send it.
+- [x] Make it easy to start or resume a conversation after a match. Completed 2026-10-30: match rows open the specific conversation, which loads the existing message history.
+- [x] Ensure mute, block, and report actions are understandable and accessible from the conversation. Completed 2026-10-30: mute persists per match and suppresses only that recipient's message notifications; messages remain available, and report/block actions are explicit with confirmation and feedback.
+- [x] Improve conversation empty, loading, failure, and no-longer-matched states. Completed 2026-10-30: added direct match loading, a distinct unavailable state for blocked/removed matches, and retry messaging that preserves loaded history during transient failures.
 
 **Done when:** a match can open a conversation, use or ignore a prompt, and reach safety actions without losing existing message history or state.
 
 ### 4. Referral measurement and reward policy
 
 - [x] Add personal referral links, signup attribution, and an invite count; keep referral codes private. Verified and deployed to the configured development database on 2026-10-28.
-- [ ] Decide whether referrals should ever receive a reward. For the first release, keep the current track-only behavior unless and until the decision is reviewed.
+- [x] Decide whether referrals should ever receive a reward. For the first release, keep the current track-only behavior unless and until the decision is reviewed. Decision 2026-10-30: first release remains track-only; any future reward requires separate product, abuse, legal, and tax review.
 - [ ] If rewards are approved, define a qualified referral event, limits, self-referral and duplicate-account protections, review/appeal handling, and clear user-facing terms.
 - [ ] Review the proposed reward with qualified legal and tax advisers before implementation; do not offer cash or withdrawable credits by default.
 - [ ] Add abuse monitoring and tests before enabling any reward.

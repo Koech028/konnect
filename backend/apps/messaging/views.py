@@ -71,15 +71,25 @@ class MessageViewSet(viewsets.GenericViewSet):
         other_user = match.other_user(request.user)
         activity, _ = MessageActivity.objects.get_or_create(match=match, user=request.user)
         if request.method == 'POST':
-            is_typing = request.data.get('typing')
-            if not isinstance(is_typing, bool):
-                return Response({'typing': ['A boolean value is required.']}, status=status.HTTP_400_BAD_REQUEST)
-            from datetime import timedelta
-            activity.typing_until = timezone.now() + timedelta(seconds=5) if is_typing else None
-            activity.save(update_fields=('typing_until',))
+            fields = ('typing', 'muted')
+            supplied = [field for field in fields if field in request.data]
+            if not supplied:
+                return Response({'detail': 'Provide typing or muted.'}, status=status.HTTP_400_BAD_REQUEST)
+            if any(not isinstance(request.data[field], bool) for field in supplied):
+                return Response({field: ['A boolean value is required.'] for field in supplied if not isinstance(request.data[field], bool)}, status=status.HTTP_400_BAD_REQUEST)
+            update_fields = []
+            if 'typing' in supplied:
+                from datetime import timedelta
+                activity.typing_until = timezone.now() + timedelta(seconds=5) if request.data['typing'] else None
+                update_fields.append('typing_until')
+            if 'muted' in supplied:
+                activity.muted = request.data['muted']
+                update_fields.append('muted')
+            activity.save(update_fields=update_fields)
         other_activity = MessageActivity.objects.filter(match=match, user=other_user).first()
         return Response({
             'other_user_typing': bool(
                 other_activity and other_activity.typing_until and other_activity.typing_until > timezone.now()
             ),
+            'is_muted': activity.muted,
         })

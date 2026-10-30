@@ -22,6 +22,7 @@ class MessageActivity(models.Model):
     match = models.ForeignKey(Match, on_delete=models.CASCADE, related_name='activities')
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='message_activities')
     typing_until = models.DateTimeField(null=True, blank=True)
+    muted = models.BooleanField(default=False)
 
     class Meta:
         constraints = [
