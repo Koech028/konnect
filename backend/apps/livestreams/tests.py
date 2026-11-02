@@ -322,9 +322,11 @@ class LiveStreamApiTests(APITestCase):
 
         listing = self.client.get('/api/v1/live/')
         detail = self.client.get(f'/api/v1/live/{self.stream.id}/')
+        join = self.client.post(f'/api/v1/live/{self.stream.id}/join/', {}, format='json')
 
         self.assertEqual(listing.data['results'], [])
         self.assertEqual(detail.status_code, 404)
+        self.assertEqual(join.status_code, 404)
 
     def test_only_host_can_end_a_stream(self):
         forbidden = self.client.post(f'/api/v1/live/{self.stream.id}/end/', {}, format='json')

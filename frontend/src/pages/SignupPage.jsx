@@ -41,7 +41,7 @@ export default function SignupPage() {
         referral_code: referralCode,
         interests: formData.interests.split(',').map(item => item.trim()).filter(Boolean)
       })
-      navigate('/')
+      navigate(`/verify-email?email=${encodeURIComponent(formData.email.trim())}`)
     } catch (err) {
       setError(err.message || 'Unable to create your account. Please try again.')
     } finally {

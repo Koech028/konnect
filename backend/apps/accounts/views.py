@@ -1,19 +1,27 @@
-import os
-
 from django.contrib.auth import get_user_model
-from django.contrib.auth.tokens import default_token_generator
+from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError as DjangoValidationError
-from django.core.mail import send_mail
-from django.utils.encoding import force_str
-from django.utils.http import urlsafe_base64_decode, urlsafe_base64_encode
-from rest_framework.exceptions import ValidationError
+from django.db import transaction
 from rest_framework import generics, permissions, throttling
+from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from rest_framework_simplejwt.tokens import RefreshToken
 
-from apps.accounts.serializers import CurrentUserSerializer, RegistrationSerializer
+from apps.accounts.models import EmailVerificationCode
+from apps.accounts.otp import (
+    consume_email_code,
+    has_recent_code,
+    send_email_code,
+)
+from apps.accounts.serializers import (
+    CurrentUserSerializer,
+    EmailCodeSerializer,
+    EmailSerializer,
+    PasswordResetCodeSerializer,
+    RegistrationSerializer,
+)
 
 
 class EmailTokenObtainPairSerializer(TokenObtainPairSerializer):
@@ -31,13 +39,66 @@ class RegisterView(generics.CreateAPIView):
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        user = serializer.save()
+        user = serializer.save(is_active=False, email_verified=False)
+        send_email_code(user, EmailVerificationCode.Purpose.SIGNUP)
+        return Response({
+            'detail': 'If the address can be registered, a verification code has been sent.'
+        }, status=201)
+
+
+class SignupEmailVerifyView(APIView):
+    permission_classes = (permissions.AllowAny,)
+    throttle_classes = (throttling.ScopedRateThrottle,)
+    throttle_scope = 'otp-verify'
+
+    def post(self, request):
+        serializer = EmailCodeSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        user = get_user_model().objects.filter(
+            email__iexact=serializer.validated_data['email'],
+            is_active=False,
+            email_verified=False,
+        ).first()
+        if user is None:
+            return Response({'detail': 'The code is invalid or expired.'}, status=400)
+
+        with transaction.atomic():
+            if not consume_email_code(
+                user,
+                EmailVerificationCode.Purpose.SIGNUP,
+                serializer.validated_data['code'],
+            ):
+                return Response({'detail': 'The code is invalid or expired.'}, status=400)
+            user.email_verified = True
+            user.is_active = True
+            user.save(update_fields=('email_verified', 'is_active'))
+
         refresh = RefreshToken.for_user(user)
         return Response({
             'user': CurrentUserSerializer(user, context={'request': request}).data,
             'access': str(refresh.access_token),
             'refresh': str(refresh),
-        }, status=201)
+        })
+
+
+class SignupEmailResendView(APIView):
+    permission_classes = (permissions.AllowAny,)
+    throttle_classes = (throttling.ScopedRateThrottle,)
+    throttle_scope = 'otp-send'
+
+    def post(self, request):
+        serializer = EmailSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        user = get_user_model().objects.filter(
+            email__iexact=serializer.validated_data['email'],
+            is_active=False,
+            email_verified=False,
+        ).first()
+        if user and not has_recent_code(user, EmailVerificationCode.Purpose.SIGNUP):
+            send_email_code(user, EmailVerificationCode.Purpose.SIGNUP)
+        return Response({
+            'detail': 'If an account is awaiting verification, a code has been sent.'
+        })
 
 
 class LoginView(generics.GenericAPIView):
@@ -65,7 +126,7 @@ class MyReferralsView(APIView):
     def get(self, request):
         return Response({
             'referral_code': request.user.referral_code,
-            'successful_signups': request.user.referred_users.count(),
+            'successful_signups': request.user.referred_users.filter(email_verified=True).count(),
         })
 
 
@@ -82,53 +143,53 @@ class PremiumStatusView(APIView):
 class PasswordResetRequestView(APIView):
     permission_classes = (permissions.AllowAny,)
     throttle_classes = (throttling.ScopedRateThrottle,)
-    throttle_scope = 'auth'
+    throttle_scope = 'otp-send'
 
     def post(self, request):
-        email = request.data.get('email', '')
-        if not isinstance(email, str) or not email.strip():
-            return Response({'email': ['This field is required.']}, status=400)
-        users = get_user_model().objects.filter(email__iexact=email.strip(), is_active=True)
-        frontend_url = os.environ.get('FRONTEND_PASSWORD_RESET_URL', 'http://localhost:3000/reset-password')
-        for user in users:
-            uid = urlsafe_base64_encode(str(user.pk).encode())
-            token = default_token_generator.make_token(user)
-            reset_url = f'{frontend_url}?uid={uid}&token={token}'
-            send_mail(
-                subject='Reset your LinkUp password',
-                message=f'Use this link to choose a new password. It expires after use:\n\n{reset_url}',
-                from_email=None,
-                recipient_list=[user.email],
-                fail_silently=False,
-            )
+        serializer = EmailSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        user = get_user_model().objects.filter(
+            email__iexact=serializer.validated_data['email'],
+            is_active=True,
+            email_verified=True,
+        ).first()
+        if user and not has_recent_code(user, EmailVerificationCode.Purpose.PASSWORD_RESET):
+            send_email_code(user, EmailVerificationCode.Purpose.PASSWORD_RESET)
         return Response({
-            'detail': 'If an account exists for that email, password-reset instructions have been sent.'
+            'detail': 'If an account exists for that email, a password-reset code has been sent.'
         })
 
 
 class PasswordResetConfirmView(APIView):
     permission_classes = (permissions.AllowAny,)
     throttle_classes = (throttling.ScopedRateThrottle,)
-    throttle_scope = 'auth'
+    throttle_scope = 'otp-verify'
 
     def post(self, request):
-        uid = request.data.get('uid')
-        token = request.data.get('token')
-        password = request.data.get('password')
-        if not isinstance(uid, str) or not isinstance(token, str) or not isinstance(password, str) or not password:
-            return Response({'detail': 'uid, token, and password are required.'}, status=400)
-        try:
-            user_id = force_str(urlsafe_base64_decode(uid))
-            user = get_user_model().objects.get(pk=user_id, is_active=True)
-        except (TypeError, ValueError, OverflowError, UnicodeDecodeError, get_user_model().DoesNotExist):
-            return Response({'detail': 'The password-reset link is invalid or expired.'}, status=400)
-        if not default_token_generator.check_token(user, token):
-            return Response({'detail': 'The password-reset link is invalid or expired.'}, status=400)
-        from django.contrib.auth.password_validation import validate_password
+        serializer = PasswordResetCodeSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        email = serializer.validated_data['email']
+        user = get_user_model().objects.filter(
+            email__iexact=email,
+            is_active=True,
+            email_verified=True,
+        ).first()
+        if user is None:
+            return Response({'detail': 'The code is invalid or expired.'}, status=400)
+
+        password = serializer.validated_data['password']
         try:
             validate_password(password, user=user)
         except DjangoValidationError as exc:
             raise ValidationError({'password': list(exc.messages)}) from exc
-        user.set_password(password)
-        user.save(update_fields=('password',))
+
+        with transaction.atomic():
+            if not consume_email_code(
+                user,
+                EmailVerificationCode.Purpose.PASSWORD_RESET,
+                serializer.validated_data['code'],
+            ):
+                return Response({'detail': 'The code is invalid or expired.'}, status=400)
+            user.set_password(password)
+            user.save(update_fields=('password',))
         return Response({'detail': 'Password updated. Sign in with your new password.'})

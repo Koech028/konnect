@@ -1,14 +1,32 @@
+import re
+from datetime import timedelta
+
+from django.core import mail
+from django.test import override_settings
+from django.utils import timezone
 from rest_framework.test import APITestCase
-from django.contrib.auth.tokens import default_token_generator
 from django.core.cache import cache
-from django.utils.http import urlsafe_base64_encode
 
-from apps.accounts.models import User
+from apps.accounts.models import EmailVerificationCode, User
 
 
+@override_settings(EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend')
 class AccountApiTests(APITestCase):
     def setUp(self):
         cache.clear()
+        mail.outbox.clear()
+
+    def email_code(self, message=None):
+        body = (message or mail.outbox[-1]).body
+        match = re.search(r'\b(\d{6})\b', body)
+        self.assertIsNotNone(match)
+        return match.group(1)
+
+    def verify_signup(self, email):
+        return self.client.post('/api/v1/auth/verify-email/', {
+            'email': email,
+            'code': self.email_code(),
+        }, format='json')
 
     def test_register_login_and_current_profile(self):
         response = self.client.post('/api/v1/auth/register/', {
@@ -23,10 +41,24 @@ class AccountApiTests(APITestCase):
         }, format='json')
 
         self.assertEqual(response.status_code, 201)
-        self.assertIn('access', response.data)
-        self.assertEqual(response.data['user']['location']['city'], 'Nairobi')
-        self.assertEqual(response.data['user']['interests'], ['coffee', 'hiking'])
-        self.assertEqual(response.data['user']['email'], 'new-member@example.com')
+        user = User.objects.get(email='new-member@example.com')
+        self.assertFalse(user.is_active)
+        self.assertFalse(user.email_verified)
+        code = self.email_code()
+        self.assertNotIn(code, user.email_verification_codes.first().code_hash)
+        self.assertIn('verification code', response.data['detail'])
+        self.assertNotIn('access', response.data)
+        pending_login = self.client.post('/api/v1/auth/login/', {
+            'email': 'new-member@example.com',
+            'password': 'Mango!Sunrise_2026',
+        }, format='json')
+        self.assertEqual(pending_login.status_code, 401)
+        verified = self.verify_signup('new-member@example.com')
+        self.assertEqual(verified.status_code, 200)
+        self.assertIn('access', verified.data)
+        self.assertEqual(verified.data['user']['location']['city'], 'Nairobi')
+        self.assertEqual(verified.data['user']['interests'], ['coffee', 'hiking'])
+        self.assertEqual(verified.data['user']['email'], 'new-member@example.com')
 
         login = self.client.post('/api/v1/auth/login/', {
             'email': 'new-member@example.com',
@@ -58,9 +90,10 @@ class AccountApiTests(APITestCase):
         }, format='json')
 
         self.assertEqual(response.status_code, 201)
+        self.assertEqual(self.verify_signup('invited@example.com').status_code, 200)
         invited = User.objects.get(email='invited@example.com')
         self.assertEqual(invited.referred_by, referrer)
-        self.assertNotIn('referral_code', response.data['user'])
+        self.assertNotIn('referral_code', response.data)
         self.client.force_authenticate(referrer)
         referrals = self.client.get('/api/v1/referrals/me/')
         self.assertEqual(referrals.status_code, 200)
@@ -167,9 +200,11 @@ class AccountApiTests(APITestCase):
         }, format='json')
 
         self.assertEqual(response.status_code, 201)
-        self.assertEqual(response.data['user']['location']['city'], '')
-        self.assertEqual(response.data['user']['bio'], '')
-        self.assertEqual(response.data['user']['interests'], [])
+        self.assertEqual(self.verify_signup('minimal-member@example.com').status_code, 200)
+        user = User.objects.get(email='minimal-member@example.com')
+        self.assertEqual(user.city, '')
+        self.assertEqual(user.bio, '')
+        self.assertEqual(user.interests, [])
 
     def test_password_reset_request_does_not_reveal_account_existence(self):
         user = User.objects.create_user(
@@ -184,14 +219,116 @@ class AccountApiTests(APITestCase):
         self.assertEqual(existing.status_code, 200)
         self.assertEqual(missing.status_code, 200)
         self.assertEqual(existing.data, missing.data)
+        code = self.email_code()
 
-        uid = urlsafe_base64_encode(str(user.pk).encode())
-        token = default_token_generator.make_token(user)
         reset = self.client.post('/api/v1/auth/password-reset/confirm/', {
-            'uid': uid,
-            'token': token,
+            'email': user.email,
+            'code': code,
             'password': 'New!CedarRiver_2026',
         }, format='json')
         self.assertEqual(reset.status_code, 200)
         user.refresh_from_db()
         self.assertTrue(user.check_password('New!CedarRiver_2026'))
+        reused = self.client.post('/api/v1/auth/password-reset/confirm/', {
+            'email': user.email,
+            'code': code,
+            'password': 'Other!CedarRiver_2026',
+        }, format='json')
+        self.assertEqual(reused.status_code, 400)
+
+    def test_referrals_count_only_verified_signups(self):
+        referrer = User.objects.create_user(
+            email='inviter@example.com',
+            password='Mango!Sunrise_2026',
+            display_name='Inviter',
+            age=30,
+            gender='woman',
+        )
+        self.client.post('/api/v1/auth/register/', {
+            'email': 'invited@example.com',
+            'password': 'Mango!Sunrise_2026',
+            'display_name': 'Invited Member',
+            'age': 26,
+            'gender': 'man',
+            'referral_code': referrer.referral_code,
+        }, format='json')
+        self.client.force_authenticate(referrer)
+        before_verification = self.client.get('/api/v1/referrals/me/')
+        self.assertEqual(before_verification.data['successful_signups'], 0)
+        self.client.force_authenticate(None)
+        self.assertEqual(self.verify_signup('invited@example.com').status_code, 200)
+        self.client.force_authenticate(referrer)
+        after_verification = self.client.get('/api/v1/referrals/me/')
+        self.assertEqual(after_verification.data['successful_signups'], 1)
+
+    def test_signup_code_cannot_be_used_after_five_failed_attempts(self):
+        self.client.post('/api/v1/auth/register/', {
+            'email': 'pending@example.com',
+            'password': 'Mango!Sunrise_2026',
+            'display_name': 'Pending Member',
+            'age': 26,
+            'gender': 'woman',
+        }, format='json')
+        code = self.email_code()
+        wrong_code = '000000' if code != '000000' else '000001'
+        for _ in range(5):
+            invalid = self.client.post('/api/v1/auth/verify-email/', {
+                'email': 'pending@example.com',
+                'code': wrong_code,
+            }, format='json')
+            self.assertEqual(invalid.status_code, 400)
+        locked_out = self.client.post('/api/v1/auth/verify-email/', {
+            'email': 'pending@example.com',
+            'code': code,
+        }, format='json')
+        self.assertEqual(locked_out.status_code, 400)
+        self.assertFalse(User.objects.get(email='pending@example.com').is_active)
+
+    def test_expired_signup_code_is_rejected(self):
+        self.client.post('/api/v1/auth/register/', {
+            'email': 'expired@example.com',
+            'password': 'Mango!Sunrise_2026',
+            'display_name': 'Expired Member',
+            'age': 26,
+            'gender': 'woman',
+        }, format='json')
+        user = User.objects.get(email='expired@example.com')
+        EmailVerificationCode.objects.filter(user=user).update(
+            expires_at=timezone.now() - timedelta(seconds=1),
+        )
+        response = self.client.post('/api/v1/auth/verify-email/', {
+            'email': user.email,
+            'code': self.email_code(),
+        }, format='json')
+        self.assertEqual(response.status_code, 400)
+        user.refresh_from_db()
+        self.assertFalse(user.is_active)
+
+    def test_signup_code_can_be_resent_after_cooldown(self):
+        self.client.post('/api/v1/auth/register/', {
+            'email': 'resend@example.com',
+            'password': 'Mango!Sunrise_2026',
+            'display_name': 'Resend Member',
+            'age': 26,
+            'gender': 'woman',
+        }, format='json')
+        user = User.objects.get(email='resend@example.com')
+        self.email_code()
+
+        self.client.post('/api/v1/auth/verify-email/resend/', {
+            'email': user.email,
+        }, format='json')
+        self.assertEqual(len(mail.outbox), 1)
+
+        EmailVerificationCode.objects.filter(user=user).update(
+            created_at=timezone.now() - timedelta(minutes=2),
+        )
+        resent = self.client.post('/api/v1/auth/verify-email/resend/', {
+            'email': user.email,
+        }, format='json')
+        self.assertEqual(resent.status_code, 200)
+        self.assertEqual(len(mail.outbox), 2)
+        self.assertNotEqual(
+            EmailVerificationCode.objects.filter(user=user).order_by('-created_at').first().code_hash,
+            EmailVerificationCode.objects.filter(user=user).order_by('created_at').first().code_hash,
+        )

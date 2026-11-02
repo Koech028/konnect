@@ -40,7 +40,7 @@ export function AuthProvider({ children }) {
   const signup = useCallback(async (email, password, userData) => {
     setIsLoading(true)
     try {
-      const result = await api.post('/api/v1/auth/register/', {
+      return await api.post('/api/v1/auth/register/', {
         email,
         password,
         display_name: userData.display_name,
@@ -51,6 +51,15 @@ export function AuthProvider({ children }) {
         location: userData.location,
         referral_code: userData.referral_code || ''
       })
+    } finally {
+      setIsLoading(false)
+    }
+  }, [])
+
+  const verifyEmail = useCallback(async (email, code) => {
+    setIsLoading(true)
+    try {
+      const result = await api.post('/api/v1/auth/verify-email/', { email, code })
       setTokens(result)
       setUser(result.user)
       return result.user
@@ -76,10 +85,11 @@ export function AuthProvider({ children }) {
     isLoading,
     login,
     signup,
+    verifyEmail,
     logout,
     updateUser,
     refreshUser
-  }), [user, isLoading, login, signup, logout, updateUser, refreshUser])
+  }), [user, isLoading, login, signup, verifyEmail, logout, updateUser, refreshUser])
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }

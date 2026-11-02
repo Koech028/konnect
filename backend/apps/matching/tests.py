@@ -71,6 +71,27 @@ class MatchingApiTests(APITestCase):
         )
         self.assertEqual([item['id'] for item in receipt_update.data], [sent.data['id']])
 
+    def test_block_hides_match_and_prevents_messages_and_activity(self):
+        match, _ = Match.create_for_users(self.first, self.second)
+        self.client.force_authenticate(self.first)
+        blocked = self.client.post(
+            '/api/v1/safety/blocks/',
+            {'user_id': str(self.second.id)},
+            format='json',
+        )
+        self.assertEqual(blocked.status_code, 201)
+
+        matches = self.client.get('/api/v1/matches/')
+        self.assertEqual(matches.data['count'], 0)
+        message_url = f'/api/v1/matches/{match.id}/messages/'
+        activity_url = f'{message_url}activity/'
+        self.assertEqual(self.client.get(message_url).status_code, 403)
+        self.assertEqual(
+            self.client.post(message_url, {'text': 'Hello'}, format='json').status_code,
+            403,
+        )
+        self.assertEqual(self.client.post(activity_url, {'typing': True}, format='json').status_code, 403)
+
     def test_message_activity_reports_typing_and_respects_match_permissions(self):
         match, _ = Match.create_for_users(self.first, self.second)
         self.client.force_authenticate(self.first)
@@ -96,3 +117,27 @@ class MatchingApiTests(APITestCase):
         self.client.force_authenticate(self.second)
         activity = self.client.get(f'/api/v1/matches/{match.id}/messages/activity/')
         self.assertFalse(activity.data['other_user_typing'])
+
+    def test_muting_conversation_persists_and_suppresses_only_notifications(self):
+        from apps.notifications.models import Notification
+
+        match, _ = Match.create_for_users(self.first, self.second)
+        activity_url = f'/api/v1/matches/{match.id}/messages/activity/'
+        message_url = f'/api/v1/matches/{match.id}/messages/'
+
+        self.client.force_authenticate(self.second)
+        muted = self.client.post(activity_url, {'muted': True}, format='json')
+        self.assertEqual(muted.status_code, 200)
+        self.assertTrue(muted.data['is_muted'])
+        self.assertFalse(muted.data['other_user_typing'])
+
+        self.client.force_authenticate(self.first)
+        sent = self.client.post(message_url, {'text': 'A muted conversation still receives messages.'}, format='json')
+        self.assertEqual(sent.status_code, 201)
+        self.assertFalse(Notification.objects.filter(recipient=self.second, target_id=match.id).exists())
+
+        self.client.force_authenticate(self.second)
+        self.assertTrue(self.client.get(activity_url).data['is_muted'])
+        received = self.client.get(message_url)
+        self.assertEqual(received.status_code, 200)
+        self.assertEqual(received.data[0]['text'], 'A muted conversation still receives messages.')

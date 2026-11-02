@@ -1,14 +1,14 @@
 import { useState, useRef, useEffect } from 'react'
-import { Send, ArrowLeft, ShieldAlert } from 'lucide-react'
+import { Send, ArrowLeft, Flag, UserRoundX, Volume2, VolumeX } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import MessageBubble from './MessageBubble'
 import Avatar from '../common/Avatar'
 import { useAppData } from '../../context/AppDataContext'
 
-export default function MessageThread({ match, messages, currentUserId, currentUserInterests = [], suggestedMessage = '', otherUserTyping, onTyping, onSendMessage }) {
+export default function MessageThread({ match, messages, currentUserId, currentUserInterests = [], suggestedMessage = '', otherUserTyping, muted = false, onMute, onTyping, onSendMessage }) {
   const [newMessage, setNewMessage] = useState('')
   const [safetyError, setSafetyError] = useState('')
-  const [muted, setMuted] = useState(false)
+  const [muteBusy, setMuteBusy] = useState(false)
   const messagesEndRef = useRef(null)
   const navigate = useNavigate()
   const { setBlocked } = useAppData()
@@ -58,7 +58,9 @@ export default function MessageThread({ match, messages, currentUserId, currentU
       try {
         await setBlocked(match.user.id, true)
         setSafetyError('')
-        navigate('/messages')
+        navigate('/safety', {
+          state: { safetyMessage: `${match.user.display_name} was blocked. They can no longer match or message you.` }
+        })
       } catch (err) {
         setSafetyError(err.message || 'This profile could not be blocked right now.')
       }
@@ -66,6 +68,18 @@ export default function MessageThread({ match, messages, currentUserId, currentU
     }
 
     navigate(`/safety?userId=${encodeURIComponent(match.user.id)}`)
+  }
+
+  const handleMuteToggle = async () => {
+    setMuteBusy(true)
+    setSafetyError('')
+    try {
+      await onMute?.(!muted)
+    } catch (err) {
+      setSafetyError(err.message || 'Conversation notifications could not be updated.')
+    } finally {
+      setMuteBusy(false)
+    }
   }
 
   return (
@@ -116,18 +130,30 @@ export default function MessageThread({ match, messages, currentUserId, currentU
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <button
             type="button"
-            onClick={() => setMuted(value => !value)}
-            style={{ ...headerSafetyButtonStyle, background: muted ? 'var(--color-primary-soft)' : 'var(--color-bg)', color: muted ? 'var(--color-primary)' : 'var(--color-text-secondary)' }}
+            onClick={handleMuteToggle}
+            disabled={muteBusy}
+            title={muted ? 'Unmute conversation notifications' : 'Mute conversation notifications'}
+            aria-label={muted ? 'Unmute conversation notifications' : 'Mute conversation notifications'}
+            aria-pressed={muted}
+            style={{ ...headerSafetyButtonStyle, background: muted ? 'var(--color-primary-soft)' : 'var(--color-bg)', color: muted ? 'var(--color-primary)' : 'var(--color-text-secondary)', opacity: muteBusy ? 0.6 : 1 }}
           >
-            {muted ? 'Muted' : 'Mute'}
+            {muted ? <VolumeX size={15} /> : <Volume2 size={15} />}
           </button>
           <button
             type="button"
             onClick={() => handleSafetyAction('report')}
             style={headerSafetyButtonStyle}
           >
-            <ShieldAlert size={14} />
-            Safety
+            <Flag size={14} />
+            Report
+          </button>
+          <button
+            type="button"
+            onClick={() => handleSafetyAction('block')}
+            style={headerSafetyButtonStyle}
+          >
+            <UserRoundX size={14} />
+            Block
           </button>
         </div>
       </div>
@@ -151,7 +177,7 @@ export default function MessageThread({ match, messages, currentUserId, currentU
             </div>
             <p style={starterPrivacyStyle}>Choose one to edit it before sending. Nothing is sent automatically.</p>
             <p style={{ margin: '10px 0 0', color: 'var(--color-text-secondary)', fontSize: 12 }}>
-              {muted ? 'This conversation is muted. You can still reply when you are ready.' : 'No messages yet — start with a prompt or send your own opener.'}
+              {muted ? 'Conversation notifications are muted. Messages will still arrive here.' : 'No messages yet — start with a prompt or send your own opener.'}
             </p>
           </section>
         )}

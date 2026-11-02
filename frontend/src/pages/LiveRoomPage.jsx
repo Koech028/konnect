@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { ArrowLeft, Camera, CameraOff, Mic, MicOff, Radio, VideoOff } from 'lucide-react'
+import { ArrowLeft, Camera, CameraOff, Flag, Mic, MicOff, Radio, UserRoundX, VideoOff } from 'lucide-react'
 import { Room, RoomEvent, Track } from 'livekit-client'
 import { api } from '../utils/api'
 import { useAuth } from '../context/AuthContext'
+import { useAppData } from '../context/AppDataContext'
 
 const giftEmojis = { rose: '🌹', heart: '💖', star: '⭐', wave: '🌊' }
 
@@ -37,6 +38,7 @@ export default function LiveRoomPage() {
   const { streamId } = useParams()
   const navigate = useNavigate()
   const { user } = useAuth()
+  const { setBlocked } = useAppData()
   const [stream, setStream] = useState(null)
   const [credentials, setCredentials] = useState(null)
   const [room, setRoom] = useState(null)
@@ -279,6 +281,22 @@ export default function LiveRoomPage() {
     }
   }
 
+  const blockHost = async () => {
+    const confirmed = window.confirm(`Block ${stream.host_name}? You will leave this live stream and they will no longer be able to match or message you.`)
+    if (!confirmed) return
+    setError('')
+    setMessage('')
+    try {
+      await setBlocked(stream.host_id, true)
+      await roomRef.current?.disconnect()
+      navigate('/safety', {
+        state: { safetyMessage: `${stream.host_name} was blocked. You have left the live stream.` }
+      })
+    } catch (err) {
+      setError(err.message || 'This host could not be blocked right now.')
+    }
+  }
+
   if (loading) return <p role="status" style={{ padding: 24 }}>Joining live stream…</p>
   if (!stream && error) return <div style={{ padding: 24 }}><p role="alert" style={errorStyle}>{error}</p><button type="button" onClick={() => navigate('/live')} style={secondaryButtonStyle}>Back to live streams</button></div>
   if (stream && entryConfirmationRequired && !credentials) {
@@ -372,7 +390,10 @@ export default function LiveRoomPage() {
           </>}
       </section>
       {!isHost && stream && (
-        <p style={reportStyle}><Link to={`/safety?userId=${stream.host_id}`} style={{ color: 'inherit' }}>Report this host</Link></p>
+        <div style={safetyActionsStyle}>
+          <Link to={`/safety?userId=${stream.host_id}`} style={reportActionStyle}><Flag size={14} /> Report host</Link>
+          <button type="button" onClick={blockHost} style={blockActionStyle}><UserRoundX size={14} /> Block host</button>
+        </div>
       )}
     </div>
   )
@@ -401,4 +422,6 @@ const giftEventStyle = { padding: '7px 10px', marginBottom: 5, borderRadius: 'va
 const giftButtonStyle = { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, padding: '10px 4px', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', background: 'var(--color-bg)', color: 'var(--color-text-primary)', font: 'inherit', fontSize: 13, cursor: 'pointer' }
 const endButtonStyle = { width: '100%', padding: 12, border: 0, borderRadius: 'var(--radius-md)', background: 'var(--color-error)', color: '#fff', font: 'inherit', fontWeight: 700, cursor: 'pointer' }
 const secondaryButtonStyle = { marginTop: 12, padding: 10, border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', background: 'var(--color-surface)', color: 'var(--color-text-primary)', font: 'inherit', cursor: 'pointer' }
-const reportStyle = { margin: '12px 0', textAlign: 'center', color: 'var(--color-text-secondary)', fontSize: 13 }
+const safetyActionsStyle = { display: 'flex', justifyContent: 'center', flexWrap: 'wrap', gap: 10, margin: '12px 0' }
+const reportActionStyle = { display: 'inline-flex', alignItems: 'center', gap: 6, padding: '9px 12px', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', color: 'var(--color-text-secondary)', fontSize: 13, fontWeight: 600, textDecoration: 'none' }
+const blockActionStyle = { display: 'inline-flex', alignItems: 'center', gap: 6, padding: '9px 12px', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', background: 'var(--color-surface)', color: 'var(--color-text-secondary)', font: 'inherit', fontSize: 13, fontWeight: 600, cursor: 'pointer' }
