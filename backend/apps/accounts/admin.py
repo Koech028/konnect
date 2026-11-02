@@ -50,7 +50,7 @@ class LinkUpUserAdmin(UserAdmin):
     fieldsets = (
         (None, {'fields': ('email', 'password')}),
         ('Profile', {'fields': ('display_name', 'age', 'gender', 'bio', 'city', 'country', 'interests', 'preferences')}),
-        ('Status', {'fields': ('verification_status', 'profile_status', 'subscription_tier')}),
+        ('Status', {'fields': ('email_verified', 'verification_status', 'profile_status', 'subscription_tier')}),
         ('Permissions', {'fields': ('is_active', 'is_staff', 'is_superuser', 'groups', 'user_permissions')}),
         ('Dates', {'fields': ('last_login', 'created_at', 'last_active')}),
     )

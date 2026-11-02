@@ -4,7 +4,15 @@ from django.http import JsonResponse
 from django.urls import path
 from rest_framework_simplejwt.views import TokenRefreshView
 
-from apps.accounts.views import LoginView, RegisterView, CurrentUserView, PasswordResetRequestView, PasswordResetConfirmView
+from apps.accounts.views import (
+    CurrentUserView,
+    LoginView,
+    PasswordResetConfirmView,
+    PasswordResetRequestView,
+    RegisterView,
+    SignupEmailResendView,
+    SignupEmailVerifyView,
+)
 from apps.matching.views import LikeView, IncomingLikesView, OutgoingLikesView, MatchViewSet
 from apps.messaging.views import MessageViewSet
 from apps.notifications.views import (
@@ -52,6 +60,8 @@ urlpatterns = [
     path('health/', health_check, name='health-check'),
     path('api/v1/media/upload-url/', MediaUploadUrlView.as_view(), name='media-upload-url'),
     path('api/v1/auth/register/', RegisterView.as_view(), name='register'),
+    path('api/v1/auth/verify-email/', SignupEmailVerifyView.as_view(), name='verify-signup-email'),
+    path('api/v1/auth/verify-email/resend/', SignupEmailResendView.as_view(), name='resend-signup-email-code'),
     path('api/v1/auth/login/', LoginView.as_view(), name='token-obtain-pair'),
     path('api/v1/auth/refresh/', TokenRefreshView.as_view(), name='token-refresh'),
     path('api/v1/auth/me/', CurrentUserView.as_view(), name='current-user'),

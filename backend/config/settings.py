@@ -150,6 +150,8 @@ REST_FRAMEWORK = {
         'anon': '60/minute',
         'user': '300/minute',
         'auth': '10/minute',
+        'otp-send': '3/hour',
+        'otp-verify': '10/hour',
         'story-write': '20/day',
         'short-write': '10/day',
         'short-comment': '60/hour',

@@ -88,6 +88,21 @@ class RegistrationSerializer(serializers.ModelSerializer):
         return user
 
 
+class EmailSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+
+    def validate_email(self, value):
+        return value.strip().lower()
+
+
+class EmailCodeSerializer(EmailSerializer):
+    code = serializers.RegexField(regex=r'^\d{6}$', trim_whitespace=False)
+
+
+class PasswordResetCodeSerializer(EmailCodeSerializer):
+    password = serializers.CharField(write_only=True)
+
+
 class CurrentUserSerializer(UserSerializer):
     class Meta(UserSerializer.Meta):
         fields = UserSerializer.Meta.fields + (

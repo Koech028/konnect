@@ -1,6 +1,7 @@
 import { lazy, Suspense } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { useAuth } from './context/AuthContext'
+import LandingPage from './pages/LandingPage'
 import AppLayout from './components/layout/AppLayout'
 import FeedPage from './pages/FeedPage'
 import DiscoverPage from './pages/DiscoverPage'
@@ -20,6 +21,7 @@ import ForgotPasswordPage from './pages/ForgotPasswordPage'
 import VerificationPage from './pages/VerificationPage'
 import SafetyPage from './pages/SafetyPage'
 import ResetPasswordPage from './pages/ResetPasswordPage'
+import VerifyEmailPage from './pages/VerifyEmailPage'
 import LivePage from './pages/LivePage'
 import EventsPage from './pages/EventsPage'
 import PremiumPage from './pages/PremiumPage'
@@ -39,9 +41,16 @@ function PublicRoute({ children }) {
   return !isAuthenticated ? children : <Navigate to="/" replace />
 }
 
+function HomeRoute() {
+  const { isAuthenticated, isLoading } = useAuth()
+  if (isLoading) return <div role="status" style={{ padding: 24, textAlign: 'center' }}>Loading your account...</div>
+  return isAuthenticated ? <Navigate to="/feed" replace /> : <LandingPage />
+}
+
 export default function App() {
   return (
     <Routes>
+      <Route path="/" element={<HomeRoute />} />
       <Route path="/login" element={
         <PublicRoute>
           <LoginPage />
@@ -54,12 +63,17 @@ export default function App() {
       } />
       <Route path="/forgot-password" element={<ForgotPasswordPage />} />
       <Route path="/reset-password" element={<ResetPasswordPage />} />
+      <Route path="/verify-email" element={
+        <PublicRoute>
+          <VerifyEmailPage />
+        </PublicRoute>
+      } />
       <Route element={
         <ProtectedRoute>
           <AppLayout />
         </ProtectedRoute>
       }>
-        <Route path="/" element={<FeedPage />} />
+        <Route path="/feed" element={<FeedPage />} />
         <Route path="/discover" element={<DiscoverPage />} />
         <Route path="/messages" element={<MessagesPage />} />
         <Route path="/messages/:matchId" element={<ChatPage />} />

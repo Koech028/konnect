@@ -1,11 +1,12 @@
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { Mail } from 'lucide-react'
 import PageHeader from '../components/common/PageHeader'
 import { api } from '../utils/api'
 
 export default function ForgotPasswordPage() {
-  const [email, setEmail] = useState('')
+  const [params] = useSearchParams()
+  const [email, setEmail] = useState(params.get('email') || '')
   const [submitted, setSubmitted] = useState(false)
   const [error, setError] = useState('')
   const [isLoading, setIsLoading] = useState(false)
@@ -37,7 +38,17 @@ export default function ForgotPasswordPage() {
           <label htmlFor="reset-email" style={labelStyle}>Email address</label>
           <input id="reset-email" type="email" required value={email} onChange={event => setEmail(event.target.value)} placeholder="you@example.com" style={inputStyle} />
           <button type="submit" disabled={isLoading} style={buttonStyle}>{isLoading ? 'Sending...' : 'Continue'}</button>
-          {submitted && <p role="status" style={{ color: 'var(--color-success)', fontSize: '14px', marginTop: '14px' }}>If an account exists for that email, password-reset instructions have been sent.</p>}
+          {submitted && (
+            <div role="status" style={{ color: 'var(--color-success)', fontSize: '14px', marginTop: '14px' }}>
+              <p>If an account exists for that email, a reset code has been sent.</p>
+              <Link
+                to={`/reset-password?email=${encodeURIComponent(email.trim())}`}
+                style={{ display: 'block', marginTop: 10, color: 'var(--color-primary)', fontWeight: 600 }}
+              >
+                Enter your reset code
+              </Link>
+            </div>
+          )}
           {error && <p role="alert" style={{ color: 'var(--color-error)', fontSize: '14px', marginTop: '14px' }}>{error}</p>}
           <p style={{ color: 'var(--color-text-muted)', fontSize: '12px', marginTop: '14px' }}>For your privacy, we do not confirm whether an account exists.</p>
           <Link to="/login" style={{ display: 'block', textAlign: 'center', color: 'var(--color-primary)', textDecoration: 'none', fontWeight: 600, marginTop: '20px' }}>Back to sign in</Link>

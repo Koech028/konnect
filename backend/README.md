@@ -35,7 +35,7 @@ Copy-Item .env.example .env
 .\.venv\Scripts\python.exe manage.py runserver 127.0.0.1:8000
 ```
 
-The development email backend writes password-reset messages to the server console. Configure `DJANGO_EMAIL_BACKEND` and an email provider before sending real email. The API allows the Vite origin `http://localhost:3000` by default. Edit `.env` to change `DJANGO_SECRET_KEY`, `FRONTEND_ORIGIN`, or `FRONTEND_PASSWORD_RESET_URL`.
+The development email backend writes verification and password-reset codes to the server console. Configure `DJANGO_EMAIL_BACKEND` and a production email provider before sending real email. The API allows the Vite origin `http://localhost:3000` by default. Edit `.env` to change `DJANGO_SECRET_KEY` or `FRONTEND_ORIGIN`.
 
 ## Database and media provider configuration
 
@@ -52,10 +52,10 @@ Live camera and microphone capture happen in the browser via LiveKit WebRTC; Dja
 `render.yaml` defines a Django API and a static frontend. Create a Render Blueprint from the repository, then set the prompted environment values. The `backend/.env.example` is for local development; production secrets are entered in Render's environment settings and must not be committed:
 
 1. Create a Supabase project and paste its PostgreSQL connection string into `DATABASE_URL`. URL-encode special characters in the password and require SSL (`sslmode=require`). For Render's IPv4 network, use Supabase's session pooler if the direct database host is not reachable.
-2. Set `DJANGO_ALLOWED_HOSTS` to the API hostname only. Set `FRONTEND_ORIGIN` and `CSRF_TRUSTED_ORIGINS` to the deployed frontend origin (`https://...`), and `FRONTEND_PASSWORD_RESET_URL` to its reset route.
+2. `DJANGO_ALLOWED_HOSTS` is preconfigured in `render.yaml` as `konnect-yece.onrender.com` for the API deployment. Set `FRONTEND_ORIGIN` and `CSRF_TRUSTED_ORIGINS` to the deployed frontend origin (`https://...`). These frontend origins are separate from the API host allowlist.
 3. Configure SMTP host, username, password, and a verified sender address. Production startup intentionally fails if required SMTP credentials are missing.
 4. Use Render's generated `DJANGO_SECRET_KEY`; set the R2 credentials after creating the bucket and a public custom media domain. Keep R2 credentials private.
-5. Set `VITE_API_BASE_URL` to the API origin. This frontend uses the Django JWT endpoints for authentication; Supabase Auth is not part of the current implementation.
+5. The frontend's Render service is preconfigured with `VITE_API_BASE_URL=https://konnect-yece.onrender.com`. For a local production build, set the same value in `frontend/.env.local`. This frontend uses the Django JWT endpoints for authentication; Supabase Auth is not part of the current implementation.
 
 The API deployment runs migrations as its release command, serves Django static assets through WhiteNoise, forces HTTPS, and has a database-connected health check. Production mode refuses to start without a secret key, PostgreSQL URL, allowed host, and SMTP credentials. Back up the database, configure Supabase network access and R2 CORS/public access policy deliberately, and set up monitoring before opening registration to users.
 
@@ -73,11 +73,17 @@ Access tokens expire after 30 minutes; refresh tokens last 7 days.
 
 ### `POST /api/v1/auth/register/`
 
-Accepts `email`, `password`, `display_name`, `age` (18+), `gender`, optional `bio`, `interests`, optional `referral_code`, and either a `location: {city, country}` object or flat `city` / `country` fields. Returns `{user, access, refresh}`.
+Accepts `email`, `password`, `display_name`, `age` (18+), `gender`, optional `bio`, `interests`, optional `referral_code`, and either a `location: {city, country}` object or flat `city` / `country` fields. Creates an inactive account and sends a six-digit email code; it does not issue tokens until the email is verified.
+
+### Signup email verification
+
+* `POST /api/v1/auth/verify-email/` with `{email, code}` verifies the address, activates the account, and returns `{user, access, refresh}`.
+* `POST /api/v1/auth/verify-email/resend/` with `{email}` resends the signup code when an account is awaiting verification.
+* Codes expire after 10 minutes, are stored as hashes, are single-use, and allow at most five attempts. Sending and verification endpoints are throttled.
 
 ### `POST /api/v1/auth/login/`
 
-Accepts `{email, password}`. Returns `{user, access, refresh}`.
+Accepts `{email, password}`. Returns `{user, access, refresh}` for active, email-verified accounts.
 
 ### `POST /api/v1/auth/refresh/`
 
@@ -93,10 +99,10 @@ Returns the signed-in user's private referral code and count of accounts created
 
 ### Password reset
 
-* `POST /api/v1/auth/password-reset/` with `{email}` sends a one-time reset link. Responses do not disclose whether an account exists.
-* `POST /api/v1/auth/password-reset/confirm/` with `{uid, token, password}` validates the token and changes the password.
+* `POST /api/v1/auth/password-reset/` with `{email}` sends a six-digit reset code. Responses do not disclose whether an account exists.
+* `POST /api/v1/auth/password-reset/confirm/` with `{email, code, password}` validates and consumes the code, then changes the password.
 
-The React app currently has the password-request screen only. Add a `/reset-password` screen that reads `uid` and `token` from the emailed URL before wiring this confirmation endpoint to the UI.
+The web app and future Flutter app use the same versioned JSON API and bearer-token flow. Browser CORS settings do not apply to native Flutter networking. Keep delivery behind the backend API so a WhatsApp provider can later be added without changing the app-facing auth contract; only offer WhatsApp after the account's phone number has been verified.
 
 ## Endpoint map
 

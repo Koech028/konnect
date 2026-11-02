@@ -53,6 +53,7 @@ class User(AbstractUser):
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     email = models.EmailField(unique=True)
+    email_verified = models.BooleanField(default=True)
     display_name = models.CharField(max_length=40)
     age = models.PositiveSmallIntegerField(validators=[MinValueValidator(18), MaxValueValidator(100)])
     gender = models.CharField(max_length=20, choices=Gender.choices)
@@ -101,3 +102,26 @@ class User(AbstractUser):
         if not self.referral_code:
             self.referral_code = uuid.uuid4().hex
         super().save(*args, **kwargs)
+
+
+class EmailVerificationCode(models.Model):
+    class Purpose(models.TextChoices):
+        SIGNUP = 'signup', 'Signup'
+        PASSWORD_RESET = 'password_reset', 'Password reset'
+
+    user = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name='email_verification_codes',
+    )
+    purpose = models.CharField(max_length=20, choices=Purpose.choices)
+    code_hash = models.CharField(max_length=128)
+    attempts = models.PositiveSmallIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField()
+    consumed_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=('user', 'purpose', 'created_at')),
+        ]
