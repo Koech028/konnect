@@ -111,7 +111,7 @@ export default function MessageThread({ match, messages, currentUserId, currentU
         >
           <ArrowLeft size={22} />
         </button>
-        <Avatar src={match.user.avatar} alt={match.user.display_name} size="sm" />
+        <Avatar src={match.user.avatar} alt={match.user.display_name} size="sm" preview />
         <div style={{ flex: 1 }}>
           <h3 style={{
             fontSize: '16px',

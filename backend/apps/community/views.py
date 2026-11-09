@@ -1,7 +1,7 @@
 from datetime import timedelta
 
 from django.db import IntegrityError, transaction
-from django.db.models import Count, Q
+from django.db.models import Count, Exists, OuterRef, Q
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from django.utils.dateparse import parse_date
@@ -35,6 +35,7 @@ from apps.community.serializers import (
     ShortSerializer,
     StorySerializer,
 )
+from apps.matching.models import Follow
 from apps.safety.models import Block
 
 
@@ -98,6 +99,10 @@ def get_visible_short_queryset(request):
         likes_count=Count('likes', distinct=True),
         comments_count=Count('comments', distinct=True),
         views_count=Count('views', distinct=True),
+        following_by_me=Exists(Follow.objects.filter(
+            follower=request.user,
+            following_id=OuterRef('author_id'),
+        )),
     )
 
 

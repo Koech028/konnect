@@ -86,7 +86,7 @@ export default function OfferConversationPage() {
     <section style={pageStyle}>
       <header style={headerStyle}>
         <button type="button" aria-label="Back to messages" onClick={() => navigate('/messages')} style={iconButtonStyle}><ArrowLeft size={20} /></button>
-        <Avatar src={conversation.other_user_avatar} alt={conversation.other_user_name} size="sm" />
+        <Avatar src={conversation.other_user_avatar} alt={conversation.other_user_name} size="sm" preview />
         <div style={{ minWidth: 0, flex: 1 }}>
           <strong>{conversation.other_user_name}</strong>
           <p style={subheadingStyle}>About: {conversation.offer_title || 'an offer'}</p>

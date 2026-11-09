@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Bell, CalendarDays, MapPin, Users } from 'lucide-react'
+import { Bell, CalendarDays, MapPin, Users, UserRound } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
 import { api } from '../../utils/api'
 import Avatar from '../common/Avatar'
@@ -116,12 +116,18 @@ export default function TopHeader() {
             lineHeight: 1
           }}>{notificationCount}</span>}
         </button>
-        <button
-          onClick={() => navigate('/profile')}
-          style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
-        >
-          <Avatar src={user?.avatar} alt={user?.display_name} size="sm" />
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+          <Avatar src={user?.avatar} alt={user?.display_name} size="sm" preview />
+          <button
+            type="button"
+            aria-label="Open your profile"
+            title="Open your profile"
+            onClick={() => navigate('/profile')}
+            style={{ display: 'grid', placeItems: 'center', width: 28, height: 32, padding: 0, border: 0, borderRadius: 'var(--radius-full)', background: 'transparent', color: 'var(--color-text-secondary)', cursor: 'pointer' }}
+          >
+            <UserRound size={17} />
+          </button>
+        </div>
       </div>
     </header>
   )

@@ -13,7 +13,7 @@ from apps.accounts.views import (
     SignupEmailResendView,
     SignupEmailVerifyView,
 )
-from apps.matching.views import LikeView, IncomingLikesView, OutgoingLikesView, MatchViewSet
+from apps.matching.views import FollowView, LikeView, IncomingLikesView, OutgoingLikesView, MatchViewSet
 from apps.messaging.views import MessageViewSet
 from apps.notifications.views import (
     NotificationPreferencesView,
@@ -88,6 +88,7 @@ urlpatterns = [
     path('api/v1/posts/<uuid:post_id>/comments/', CommentViewSet.as_view({'get': 'list', 'post': 'create'}), name='post-comments'),
     path('api/v1/posts/<uuid:post_id>/poll-vote/', PollVoteView.as_view(), name='poll-vote'),
     path('api/v1/likes/', LikeView.as_view(), name='like-user'),
+    path('api/v1/follows/<uuid:user_id>/', FollowView.as_view(), name='follow-user'),
     path('api/v1/likes/incoming/', IncomingLikesView.as_view(), name='incoming-likes'),
     path('api/v1/likes/outgoing/', OutgoingLikesView.as_view(), name='outgoing-likes'),
     path('api/v1/matches/', MatchViewSet.as_view({'get': 'list'}), name='matches'),
