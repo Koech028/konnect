@@ -18,6 +18,8 @@ services:
         value: konnect-yece.onrender.com
       - key: DATABASE_URL
         sync: false
+      - key: DB_CONN_MAX_AGE
+        value: "0"
       - key: FRONTEND_ORIGIN
         value: https://linkup.malakigroup.com
       - key: CSRF_TRUSTED_ORIGINS

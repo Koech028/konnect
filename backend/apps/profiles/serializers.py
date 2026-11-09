@@ -1,6 +1,6 @@
 from rest_framework import serializers
 
-from apps.accounts.serializers import UserSerializer
+from apps.accounts.serializers import UserSerializer, validate_bio_word_count
 from apps.profiles.models import ProfilePhoto, VerificationRequest
 
 
@@ -23,6 +23,7 @@ class ProfilePhotoSerializer(serializers.ModelSerializer):
 
 
 class ProfileUpdateSerializer(serializers.ModelSerializer):
+    bio = serializers.CharField(required=False, allow_blank=True, trim_whitespace=True)
     interests = serializers.ListField(
         child=serializers.CharField(max_length=40, trim_whitespace=True),
         required=False,
@@ -41,6 +42,9 @@ class ProfileUpdateSerializer(serializers.ModelSerializer):
             'display_name', 'age', 'gender', 'bio', 'cover_image_url', 'location',
             'interests', 'preferences', 'profile_status',
         )
+
+    def validate_bio(self, value):
+        return validate_bio_word_count(value)
 
     def validate_preferences(self, value):
         if not isinstance(value, dict):

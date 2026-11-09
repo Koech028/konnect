@@ -1,10 +1,15 @@
 from rest_framework.test import APITestCase
+from django.contrib.admin.models import CHANGE, LogEntry
 from django.contrib.admin.sites import AdminSite
+from django.contrib.auth.models import Group
 from django.test import RequestFactory
 
 from apps.accounts.models import User
+from apps.notifications.models import Notification
 from apps.profiles.admin import VerificationRequestAdmin
 from apps.profiles.models import VerificationRequest
+from apps.safety.admin import MODERATOR_GROUP_NAME
+from apps.safety.models import ModerationAuditEvent
 
 
 class ProfileApiTests(APITestCase):
@@ -46,6 +51,24 @@ class ProfileApiTests(APITestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data['location']['city'], 'Westlands')
         self.assertEqual(response.data['preferences']['age_max'], 36)
+
+    def test_bio_allows_up_to_100_words_and_rejects_more(self):
+        accepted_bio = ' '.join(['description'] * 100)
+        accepted = self.client.patch(
+            '/api/v1/profiles/me/',
+            {'bio': accepted_bio},
+            format='json',
+        )
+        self.assertEqual(accepted.status_code, 200)
+        self.assertEqual(accepted.data['bio'], accepted_bio)
+
+        rejected = self.client.patch(
+            '/api/v1/profiles/me/',
+            {'bio': ' '.join(['word'] * 101)},
+            format='json',
+        )
+        self.assertEqual(rejected.status_code, 400)
+        self.assertIn('100 words or fewer', str(rejected.data['bio']))
 
     def test_cover_picture_is_independent_of_profile_picture(self):
         profile_photo = self.client.post('/api/v1/profiles/me/photos/', {
@@ -145,13 +168,17 @@ class ProfileApiTests(APITestCase):
 
     def test_admin_can_approve_verification_without_uploading_identity_documents(self):
         request = VerificationRequest.objects.create(user=self.user)
-        admin_user = User.objects.create_superuser(
+        request.review_notes = 'Identity check approved.'
+        request.save(update_fields=('review_notes',))
+        admin_user = User.objects.create_user(
             email='moderator@example.com',
             password='Mango!Sunrise_2026',
             display_name='Moderator',
             age=35,
             gender='other',
+            is_staff=True,
         )
+        admin_user.groups.add(Group.objects.get(name=MODERATOR_GROUP_NAME))
         admin_request = RequestFactory().post('/admin/profiles/verificationrequest/')
         admin_request.user = admin_user
         model_admin = VerificationRequestAdmin(VerificationRequest, AdminSite())
@@ -163,3 +190,17 @@ class ProfileApiTests(APITestCase):
         self.assertEqual(request.status, VerificationRequest.Status.APPROVED)
         self.assertEqual(request.reviewed_by, admin_user)
         self.assertEqual(self.user.verification_status, User.VerificationStatus.VERIFIED)
+        self.assertTrue(Notification.objects.filter(
+            recipient=self.user,
+            actor=admin_user,
+            type=Notification.Type.VERIFICATION,
+        ).exists())
+        audit_event = ModerationAuditEvent.objects.get(case_id=request.pk)
+        self.assertEqual(audit_event.actor, admin_user)
+        self.assertEqual(audit_event.action, VerificationRequest.Status.APPROVED)
+        self.assertEqual(audit_event.review_notes, 'Identity check approved.')
+        self.assertTrue(LogEntry.objects.filter(
+            user=admin_user,
+            object_id=str(request.pk),
+            action_flag=CHANGE,
+        ).exists())

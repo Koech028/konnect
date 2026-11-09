@@ -28,6 +28,8 @@ import EventsPage from './pages/EventsPage'
 import PremiumPage from './pages/PremiumPage'
 import ShortsPage from './pages/ShortsPage'
 import ReferralPage from './pages/ReferralPage'
+import OffersPage from './pages/OffersPage'
+import OfferConversationPage from './pages/OfferConversationPage'
 const LiveRoomPage = lazy(() => import('./pages/LiveRoomPage'))
 
 function ProtectedRoute({ children }) {
@@ -94,6 +96,8 @@ export default function App() {
         <Route path="/live" element={<LivePage />} />
         <Route path="/shorts" element={<ShortsPage />} />
         <Route path="/events" element={<EventsPage />} />
+        <Route path="/offers" element={<OffersPage />} />
+        <Route path="/offer-conversations/:conversationId" element={<OfferConversationPage />} />
         <Route path="/premium" element={<PremiumPage />} />
         <Route path="/live/:streamId" element={<Suspense fallback={<div role="status" style={{ padding: 24 }}>Loading live room…</div>}><LiveRoomPage /></Suspense>} />
         <Route path="/notifications" element={<NotificationsPage />} />

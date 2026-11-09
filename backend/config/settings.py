@@ -39,6 +39,7 @@ INSTALLED_APPS = [
     'apps.messaging',
     'apps.notifications',
     'apps.safety',
+    'apps.operations',
     'apps.livestreams',
     'apps.community',
 ]
@@ -76,8 +77,13 @@ ASGI_APPLICATION = 'config.asgi.application'
 DATABASE_URL = os.environ.get('DATABASE_URL', '').strip()
 if not DATABASE_URL and not DEBUG:
     raise RuntimeError('DATABASE_URL must be set when DEBUG is false.')
+DB_CONN_MAX_AGE = int(os.environ.get('DB_CONN_MAX_AGE', '0'))
 DATABASES = {
-    'default': dj_database_url.parse(DATABASE_URL, conn_max_age=600)
+    'default': dj_database_url.parse(
+        DATABASE_URL,
+        conn_max_age=DB_CONN_MAX_AGE,
+        conn_health_checks=DB_CONN_MAX_AGE > 0,
+    )
     if DATABASE_URL
     else {
         'ENGINE': 'django.db.backends.sqlite3',
@@ -159,6 +165,8 @@ REST_FRAMEWORK = {
         'content-report': '10/day',
         'media-upload': '40/hour',
         'event-write': '30/hour',
+        'offer-write': '20/day',
+        'offer-message': '30/hour',
     },
 }
 
@@ -170,25 +178,43 @@ SIMPLE_JWT = {
     'BLACKLIST_AFTER_ROTATION': False,
 }
 
-EMAIL_BACKEND = os.environ.get('DJANGO_EMAIL_BACKEND') or (
-    'django.core.mail.backends.console.EmailBackend'
-    if DEBUG else 'django.core.mail.backends.smtp.EmailBackend'
+SMTP_EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+CONSOLE_EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+configured_email_backend = os.environ.get('DJANGO_EMAIL_BACKEND', '').strip()
+smtp_configuration_present = any(
+    os.environ.get(name, '').strip()
+    for name in (
+        'DJANGO_EMAIL_HOST',
+        'DJANGO_EMAIL_HOST_USER',
+        'DJANGO_EMAIL_HOST_PASSWORD',
+        'DJANGO_DEFAULT_FROM_EMAIL',
+    )
+)
+EMAIL_BACKEND = configured_email_backend or (
+    CONSOLE_EMAIL_BACKEND
+    if DEBUG and not smtp_configuration_present
+    else SMTP_EMAIL_BACKEND
 )
 EMAIL_HOST = os.environ.get('DJANGO_EMAIL_HOST', '')
 EMAIL_PORT = int(os.environ.get('DJANGO_EMAIL_PORT', '587'))
 EMAIL_HOST_USER = os.environ.get('DJANGO_EMAIL_HOST_USER', '')
 EMAIL_HOST_PASSWORD = os.environ.get('DJANGO_EMAIL_HOST_PASSWORD', '')
 EMAIL_USE_TLS = os.environ.get('DJANGO_EMAIL_USE_TLS', 'true').lower() == 'true'
-DEFAULT_FROM_EMAIL = os.environ.get('DJANGO_DEFAULT_FROM_EMAIL', 'noreply@linkup.local')
-if not DEBUG and EMAIL_BACKEND == 'django.core.mail.backends.smtp.EmailBackend':
+CONFIGURED_DEFAULT_FROM_EMAIL = os.environ.get('DJANGO_DEFAULT_FROM_EMAIL', '').strip()
+DEFAULT_FROM_EMAIL = CONFIGURED_DEFAULT_FROM_EMAIL or 'noreply@linkup.local'
+EMAIL_TIMEOUT = 10
+if EMAIL_BACKEND == CONSOLE_EMAIL_BACKEND and not DEBUG:
+    raise RuntimeError('The console email backend cannot be used when DEBUG is false.')
+if EMAIL_BACKEND == SMTP_EMAIL_BACKEND:
     missing_email_settings = [
         name for name, value in (
             ('DJANGO_EMAIL_HOST', EMAIL_HOST),
             ('DJANGO_EMAIL_HOST_USER', EMAIL_HOST_USER),
             ('DJANGO_EMAIL_HOST_PASSWORD', EMAIL_HOST_PASSWORD),
+            ('DJANGO_DEFAULT_FROM_EMAIL', CONFIGURED_DEFAULT_FROM_EMAIL),
         ) if not value
     ]
     if missing_email_settings:
         raise RuntimeError(
-            f'Production SMTP is enabled but these settings are missing: {", ".join(missing_email_settings)}.'
+            f'SMTP email is enabled but these settings are missing: {", ".join(missing_email_settings)}.'
         )

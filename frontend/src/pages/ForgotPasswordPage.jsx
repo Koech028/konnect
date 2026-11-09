@@ -15,7 +15,7 @@ export default function ForgotPasswordPage() {
     event.preventDefault()
     setIsLoading(true)
     try {
-      await api.post('/api/v1/auth/password-reset/', { email })
+      await api.post('/api/v1/auth/password-reset/', { email: email.trim() })
       setSubmitted(true)
       setError('')
     } catch (err) {
@@ -40,7 +40,7 @@ export default function ForgotPasswordPage() {
           <button type="submit" disabled={isLoading} style={buttonStyle}>{isLoading ? 'Sending...' : 'Continue'}</button>
           {submitted && (
             <div role="status" style={{ color: 'var(--color-success)', fontSize: '14px', marginTop: '14px' }}>
-              <p>If an account exists for that email, a reset code has been sent.</p>
+              <p>If an account exists for that email, a reset code has been sent. Check your inbox and spam or junk folder.</p>
               <Link
                 to={`/reset-password?email=${encodeURIComponent(email.trim())}`}
                 style={{ display: 'block', marginTop: 10, color: 'var(--color-primary)', fontWeight: 600 }}

@@ -42,6 +42,14 @@ class VerificationRequest(models.Model):
         blank=True,
         related_name='verification_reviews',
     )
+    assigned_to = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='assigned_verification_requests',
+    )
+    review_notes = models.TextField(blank=True)
 
     class Meta:
         ordering = ('-created_at',)

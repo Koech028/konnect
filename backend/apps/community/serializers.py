@@ -2,9 +2,12 @@ from django.utils import timezone
 from rest_framework import serializers
 
 from apps.community.models import (
+    ActivityOffer,
     DailyPromptResponse,
     DatingEvent,
     EventRSVP,
+    OfferConversation,
+    OfferMessage,
     Short,
     ShortComment,
     Story,
@@ -161,3 +164,110 @@ class DatingEventSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         return DatingEvent.objects.create(host=self.context['request'].user, **validated_data)
+
+
+class ActivityOfferSerializer(serializers.ModelSerializer):
+    host_id = serializers.UUIDField(source='host.id', read_only=True)
+    host_name = serializers.CharField(source='host.display_name', read_only=True)
+    host_age = serializers.IntegerField(source='host.age', read_only=True)
+    host_avatar = serializers.CharField(source='host.avatar_url', read_only=True)
+    host_verification_status = serializers.CharField(source='host.verification_status', read_only=True)
+
+    class Meta:
+        model = ActivityOffer
+        fields = (
+            'id', 'host_id', 'host_name', 'host_age', 'host_avatar', 'host_verification_status',
+            'category', 'title', 'description', 'city', 'location', 'starts_at', 'ends_at',
+            'image_url', 'activities', 'boundaries', 'price_ksh', 'lunch_expectation',
+            'is_active', 'created_at',
+        )
+        read_only_fields = (
+            'id', 'host_id', 'host_name', 'host_age', 'host_avatar',
+            'host_verification_status', 'created_at',
+        )
+        extra_kwargs = {
+            'description': {'required': False, 'allow_blank': True},
+            'image_url': {'required': False, 'allow_blank': True},
+            'activities': {'required': False},
+            'price_ksh': {'max_value': 1_000_000},
+            'boundaries': {'trim_whitespace': True},
+        }
+
+    def validate_activities(self, value):
+        normalized = [activity.strip() for activity in value if activity.strip()]
+        if len(normalized) > 10:
+            raise serializers.ValidationError('List no more than 10 activities.')
+        if any(len(activity) > 60 for activity in normalized):
+            raise serializers.ValidationError('Each activity must be 60 characters or fewer.')
+        return normalized
+
+    def validate_image_url(self, value):
+        if value and not value.startswith('https://'):
+            raise serializers.ValidationError('Offer images must use a secure HTTPS URL.')
+        return value
+
+    def validate(self, attrs):
+        starts_at = attrs.get('starts_at', getattr(self.instance, 'starts_at', None))
+        ends_at = attrs.get('ends_at', getattr(self.instance, 'ends_at', None))
+        if starts_at and starts_at <= timezone.now():
+            raise serializers.ValidationError({'starts_at': 'Choose a future date and time.'})
+        if starts_at and ends_at and ends_at <= starts_at:
+            raise serializers.ValidationError({'ends_at': 'The offer must end after it starts.'})
+        if not self.instance and 'lunch_expectation' not in attrs:
+            raise serializers.ValidationError({'lunch_expectation': 'Choose a lunch expectation.'})
+        return attrs
+
+    def create(self, validated_data):
+        validated_data['host'] = self.context['request'].user
+        return super().create(validated_data)
+
+
+class OfferMessageSerializer(serializers.ModelSerializer):
+    sender_id = serializers.UUIDField(read_only=True)
+
+    class Meta:
+        model = OfferMessage
+        fields = ('id', 'sender_id', 'text', 'created_at', 'read_at')
+        read_only_fields = ('id', 'sender_id', 'created_at', 'read_at')
+
+    def validate_text(self, value):
+        value = value.strip()
+        if not value:
+            raise serializers.ValidationError('Message cannot be empty.')
+        return value
+
+
+class OfferConversationSerializer(serializers.ModelSerializer):
+    other_user_id = serializers.SerializerMethodField()
+    other_user_name = serializers.SerializerMethodField()
+    other_user_avatar = serializers.SerializerMethodField()
+    offer_id = serializers.UUIDField(source='offer.id', read_only=True, allow_null=True)
+    offer_title = serializers.CharField(source='offer.title', read_only=True, allow_null=True)
+    last_message = serializers.SerializerMethodField()
+    unread_count = serializers.SerializerMethodField()
+
+    class Meta:
+        model = OfferConversation
+        fields = (
+            'id', 'other_user_id', 'other_user_name', 'other_user_avatar',
+            'offer_id', 'offer_title', 'last_message', 'unread_count', 'updated_at',
+        )
+
+    def get_other_user(self, obj):
+        return obj.host if obj.requester_id == self.context['request'].user.id else obj.requester
+
+    def get_other_user_id(self, obj):
+        return str(self.get_other_user(obj).id)
+
+    def get_other_user_name(self, obj):
+        return self.get_other_user(obj).display_name
+
+    def get_other_user_avatar(self, obj):
+        return self.get_other_user(obj).avatar_url
+
+    def get_last_message(self, obj):
+        message = obj.messages.order_by('-created_at').first()
+        return message.text if message else ''
+
+    def get_unread_count(self, obj):
+        return obj.messages.exclude(sender=self.context['request'].user).filter(read_at__isnull=True).count()

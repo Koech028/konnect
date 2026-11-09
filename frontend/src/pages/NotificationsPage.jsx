@@ -34,6 +34,7 @@ export default function NotificationsPage() {
   const markRead = async notification => {
     if (notification.read) {
       if (notification.target_type === 'match') navigate(`/messages/${notification.target_id}`)
+      if (notification.target_type === 'offer_conversation') navigate(`/offer-conversations/${notification.target_id}`)
       if (notification.target_type === 'post') navigate(`/posts/${notification.target_id}`)
       if (notification.target_type === 'profile') navigate(`/users/${notification.target_id}`)
       return
@@ -41,7 +42,9 @@ export default function NotificationsPage() {
     try {
       const updated = await api.post(`/api/v1/notifications/${notification.id}/read/`, {})
       setNotifications(current => current.map(item => item.id === updated.id ? updated : item))
+      window.dispatchEvent(new Event('notifications:updated'))
       if (updated.target_type === 'match') navigate(`/messages/${updated.target_id}`)
+      if (updated.target_type === 'offer_conversation') navigate(`/offer-conversations/${updated.target_id}`)
       if (updated.target_type === 'post') navigate(`/posts/${updated.target_id}`)
       if (updated.target_type === 'profile') navigate(`/users/${updated.target_id}`)
     } catch (err) {
@@ -53,6 +56,7 @@ export default function NotificationsPage() {
     try {
       await api.post('/api/v1/notifications/read-all/', {})
       setNotifications(current => current.map(item => ({ ...item, read: true })))
+      window.dispatchEvent(new Event('notifications:updated'))
       setError('')
     } catch (err) {
       setError(err.message || 'Could not mark notifications as read.')

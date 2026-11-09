@@ -33,9 +33,12 @@ from apps.livestreams.views import (
     WalletView,
 )
 from apps.community.views import (
+    ActivityOfferDetailView,
+    ActivityOfferListCreateView,
     DailyPromptView,
     EventDetailView,
     EventListCreateView,
+    OfferConversationDetailView,
     ShortCommentListCreateView,
     ShortDetailView,
     ShortLikeView,
@@ -43,6 +46,9 @@ from apps.community.views import (
     ShortWatchView,
     StoryDetailView,
     StoryListCreateView,
+    OfferConversationListView,
+    OfferMessageView,
+    StartOfferConversationView,
 )
 from apps.accounts.views import MyReferralsView, PremiumStatusView
 from config.media import MediaUploadUrlView
@@ -89,6 +95,7 @@ urlpatterns = [
     path('api/v1/matches/<uuid:match_id>/messages/', MessageViewSet.as_view({'get': 'list', 'post': 'create'}), name='match-messages'),
     path('api/v1/matches/<uuid:match_id>/messages/activity/', MessageViewSet.as_view({'get': 'activity', 'post': 'activity'}), name='match-message-activity'),
     path('api/v1/notifications/', NotificationViewSet.as_view({'get': 'list'}), name='notifications'),
+    path('api/v1/notifications/unread-count/', NotificationViewSet.as_view({'get': 'unread_count'}), name='notifications-unread-count'),
     path('api/v1/notifications/read-all/', NotificationViewSet.as_view({'post': 'read_all'}), name='notifications-read-all'),
     path('api/v1/notifications/<uuid:pk>/read/', NotificationViewSet.as_view({'post': 'mark_read'}), name='notification-read'),
     path('api/v1/settings/notifications/', NotificationPreferencesView.as_view(), name='notification-preferences'),
@@ -104,6 +111,12 @@ urlpatterns = [
     path('api/v1/prompts/today/', DailyPromptView.as_view(), name='daily-prompt-today'),
     path('api/v1/events/', EventListCreateView.as_view(), name='event-list-create'),
     path('api/v1/events/<uuid:pk>/', EventDetailView.as_view(), name='event-detail'),
+    path('api/v1/offers/', ActivityOfferListCreateView.as_view(), name='activity-offer-list-create'),
+    path('api/v1/offers/<uuid:pk>/', ActivityOfferDetailView.as_view(), name='activity-offer-detail'),
+    path('api/v1/offers/<uuid:offer_id>/messages/', StartOfferConversationView.as_view(), name='offer-start-conversation'),
+    path('api/v1/offers/conversations/', OfferConversationListView.as_view(), name='offer-conversation-list'),
+    path('api/v1/offers/conversations/<int:pk>/', OfferConversationDetailView.as_view(), name='offer-conversation-detail'),
+    path('api/v1/offers/conversations/<int:pk>/messages/', OfferMessageView.as_view(), name='offer-conversation-messages'),
     path('api/v1/safety/blocks/', BlockViewSet.as_view({'get': 'list', 'post': 'create'}), name='blocks'),
     path('api/v1/safety/blocks/<uuid:pk>/', BlockViewSet.as_view({'delete': 'destroy'}), name='block-detail'),
     path('api/v1/safety/reports/', ReportViewSet.as_view({'get': 'list', 'post': 'create'}), name='reports'),

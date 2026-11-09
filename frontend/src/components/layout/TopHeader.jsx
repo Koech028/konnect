@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Bell, CalendarDays, MapPin } from 'lucide-react'
+import { Bell, CalendarDays, MapPin, Users } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
 import { api } from '../../utils/api'
 import Avatar from '../common/Avatar'
@@ -8,12 +8,17 @@ import Avatar from '../common/Avatar'
 export default function TopHeader() {
   const navigate = useNavigate()
   const { user } = useAuth()
-  const [hasUnread, setHasUnread] = useState(false)
+  const [notificationCount, setNotificationCount] = useState(0)
 
   useEffect(() => {
-    api.get('/api/v1/notifications/')
-      .then(response => setHasUnread((response.results || response).some(notification => !notification.read)))
-      .catch(error => console.error('Could not load unread notification status:', error))
+    const loadNotificationCount = () => {
+      api.get('/api/v1/notifications/unread-count/')
+        .then(response => setNotificationCount(response.count || 0))
+        .catch(error => console.error('Could not load notification count:', error))
+    }
+    loadNotificationCount()
+    window.addEventListener('notifications:updated', loadNotificationCount)
+    return () => window.removeEventListener('notifications:updated', loadNotificationCount)
   }, [])
 
   return (
@@ -66,6 +71,16 @@ export default function TopHeader() {
           <CalendarDays size={21} />
         </button>
         <button
+          type="button"
+          aria-label="Hangouts and services"
+          onClick={() => navigate('/offers')}
+          style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '8px', color: 'var(--color-text-secondary)' }}
+        >
+          <Users size={21} />
+        </button>
+        <button
+          type="button"
+          aria-label={notificationCount ? `Notifications, ${notificationCount} total` : 'Notifications'}
           onClick={() => navigate('/notifications')}
           style={{
             position: 'relative',
@@ -81,16 +96,25 @@ export default function TopHeader() {
           onMouseLeave={e => e.currentTarget.style.background = 'none'}
         >
           <Bell size={22} />
-          {hasUnread && <span style={{
+          {notificationCount > 0 && <span style={{
             position: 'absolute',
-            top: '6px',
-            right: '6px',
-            width: '8px',
-            height: '8px',
-            borderRadius: '50%',
+            top: '1px',
+            right: '0',
+            minWidth: '18px',
+            height: '18px',
+            padding: '0 4px',
+            boxSizing: 'border-box',
+            borderRadius: '9px',
             background: 'var(--color-primary)',
-            border: '2px solid var(--color-surface)'
-          }} />}
+            border: '2px solid var(--color-surface)',
+            color: '#fff',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: '10px',
+            fontWeight: 700,
+            lineHeight: 1
+          }}>{notificationCount}</span>}
         </button>
         <button
           onClick={() => navigate('/profile')}

@@ -35,11 +35,11 @@ Copy-Item .env.example .env
 .\.venv\Scripts\python.exe manage.py runserver 127.0.0.1:8000
 ```
 
-The development email backend writes verification and password-reset codes to the server console. Configure `DJANGO_EMAIL_BACKEND` and a production email provider before sending real email. The API allows the Vite origin `http://localhost:3000` by default. Edit `.env` to change `DJANGO_SECRET_KEY` or `FRONTEND_ORIGIN`.
+The development email backend writes verification and password-reset codes to the server console. To test delivery to an inbox, set the SMTP host, port, username, app password, TLS setting, and verified sender address in `backend/.env`; never commit these credentials. Production uses SMTP, has a 10-second connection timeout, and refuses to start without the host, credentials, and sender address. Set those variables as secrets in the deployment provider, not in frontend configuration. The API allows the Vite origin `http://localhost:3000` by default. Edit `.env` to change `DJANGO_SECRET_KEY` or `FRONTEND_ORIGIN`.
 
 ## Database and media provider configuration
 
-PostgreSQL is the right fit for the app's relational user, profile, post, like, match, and message data. Supabase PostgreSQL can host the database. Put its PostgreSQL connection string in `DATABASE_URL`; local development uses SQLite when `DEBUG=true` and no URL is set. Django currently handles passwords and JWT authentication; setting Supabase Auth keys alone does not change that. The React app still contains demo/local-storage data flows, so those must be connected to the API before this is a complete production application.
+PostgreSQL is the right fit for the app's relational user, profile, post, like, match, and message data. Supabase PostgreSQL can host the database. Put its PostgreSQL connection string in `DATABASE_URL`; local development uses SQLite when `DEBUG=true` and no URL is set. `DB_CONN_MAX_AGE` controls Django's persistent database connection lifetime and defaults to `0`, closing a connection after each request to avoid holding idle Supabase session-pooler slots. If persistent connections are enabled, set a conservative lifetime and monitor the pooler's connection limit. If Supabase reports `EMAXCONNSESSION`, restart the API instances and any open management shells to release their existing sessions, then retry migrations once the pool has capacity. Django currently handles passwords and JWT authentication; setting Supabase Auth keys alone does not change that. The React app still contains demo/local-storage data flows, so those must be connected to the API before this is a complete production application.
 
 Cloudflare R2 credentials are server-only configuration. Authenticated active users request short-lived, content-type/size-bound upload URLs from `POST /api/v1/media/upload-url/`. The browser uploads media bytes directly to R2 with `PUT`; Django does not proxy or persist file bytes. Images support JPEG, PNG, or WebP up to 5 MB. Videos support MP4, WebM, or QuickTime up to 50 MB. The returned HTTPS URL is then saved in the API for a profile photo, photo/event post, video post, story, or Short. Short/story/post videos are limited to 60 seconds by the frontend duration check, and the API validates the declared duration where applicable. Actual file contents/duration are not inspected or transcoded on the server.
 
@@ -60,6 +60,8 @@ Live camera and microphone capture happen in the browser via LiveKit WebRTC; Dja
 The API deployment runs migrations as its release command, serves Django static assets through WhiteNoise, forces HTTPS, and has a database-connected health check. Production mode refuses to start without a secret key, PostgreSQL URL, allowed host, and SMTP credentials. Back up the database, configure Supabase network access and R2 CORS/public access policy deliberately, and set up monitoring before opening registration to users.
 
 Health check: `GET http://127.0.0.1:8000/health/`
+
+Before a production launch, run `python manage.py check_deployment` from the backend service shell. This read-only preflight verifies production HTTPS settings, PostgreSQL connectivity and unapplied migrations, SMTP authentication, and access to the configured R2 bucket; it never sends email or changes stored data. It requires the production environment variables and service network access, and does not replace an actual backup restore, email inbox delivery, upload/download, monitoring-alert, or browser journey test. Do not run it against a different environment by mistake.
 
 ## Authentication
 
@@ -101,6 +103,8 @@ Returns the signed-in user's private referral code and count of accounts created
 
 * `POST /api/v1/auth/password-reset/` with `{email}` sends a six-digit reset code. Responses do not disclose whether an account exists.
 * `POST /api/v1/auth/password-reset/confirm/` with `{email, code, password}` validates and consumes the code, then changes the password.
+
+Password reset codes are emailed to the account address, expire after 10 minutes, and are single-use with a five-attempt limit. The web flow returns a generic request confirmation, guides the user to check their inbox/junk folder, and then lets them set a new password and sign in. If SMTP delivery fails, the request returns an error and does not leave a usable or resend-blocking code.
 
 The web app and future Flutter app use the same versioned JSON API and bearer-token flow. Browser CORS settings do not apply to native Flutter networking. Keep delivery behind the backend API so a WhatsApp provider can later be added without changing the app-facing auth contract; only offer WhatsApp after the account's phone number has been verified.
 
@@ -187,11 +191,23 @@ There is no creator withdrawal feature or real-money movement. Before enabling p
 
 Stories can contain text, an image, or a short video and expire after 24 hours. Shorts are videos up to 60 seconds in the client, with likes, comments, and deduplicated signed-in views. Both use the signed R2 upload flow; images are capped at 5 MB, and MP4, WebM, and QuickTime uploads at 50 MB. Upload URL requests are throttled and require an active account. Video duration is checked in the browser and the declared duration is validated by the API; upload processing/transcoding and server-side media inspection are not included. Blocking an author hides their stories and Shorts and prevents interactions.
 
-Shorts and their comments can be reported from the feed. A user can submit one report per item; reports are private to the reporter and are available to staff in Django Admin for review.
+Shorts and their comments can be reported from the feed. A user can submit one report per item; reports are private to the reporter and are available to authorized moderators in Django Admin for review.
 
 The daily conversation prompt changes each day. Answers are private to the account and can be edited during that day; participation is optional. Events are visible to signed-in users, use a public venue description, and support capacity-limited RSVPs. Blocking a host hides their events and prevents event access.
 
-Verification requests are reviewed by staff in Django Admin. Select pending requests and use **Approve selected verification requests** or **Reject selected verification requests**; users are notified of the decision. This flow deliberately does not collect identity documents.
+### Activity offers and hangouts
+
+The separate Offers page lets active users browse and filter future-dated hangouts or services by type, city, and price. An offer includes a public venue, start/end time, activities, boundaries, and whether lunch is expected; the advertised price is in KSh, with `0` meaning free. Prices are informational only: the app does not collect, escrow, or transfer payment. Hosts can add an image using the R2 upload flow. Offer hosts must use a public venue, and users can report offers through the existing content-report workflow.
+
+Signed-in active users can message an offer host directly without matching. Conversations appear in the offer inbox and use the same report/block safety controls; blocking either participant makes the offer and conversation unavailable. The API is rooted at `/api/v1/offers/`, with conversation list/detail and message endpoints under `/api/v1/offers/conversations/`.
+
+Verification requests are reviewed in Django Admin. Select pending requests and use **Approve selected verification requests** or **Reject selected verification requests**; users are notified of the decision. This flow deliberately does not collect identity documents.
+
+### Admin and moderation roles
+
+The `Moderators` group is created by database migrations. A superuser must grant admin access by setting a staff account's `is_staff` flag and adding it to this group. Only superusers can access or manage user accounts and Django groups. Moderators can access user reports, content reports, and verification requests, but cannot create or delete cases, manage accounts, or grant themselves access. Do not assign general staff access without the `Moderators` group.
+
+Moderation queues support status filters, assignment, review notes, and actions to claim, mark as reviewing, or close reports. Verification requests can be claimed, approved, or rejected; decisions update the user's verification status and send an in-app notification. Each update creates a read-only moderation audit event with the actor, time, case, status transition, and review-note snapshot; Django Admin history also records changed fields. Keep moderator membership limited to trained staff; this admin workflow is not a substitute for an approved appeals or retention policy.
 
 Premium status is an administrator-managed entitlement during this beta. It adds the profile badge; there is no checkout, billing, or self-service promotion. Set the user's subscription tier in Django Admin only when granting premium.
 
@@ -230,7 +246,7 @@ Profile responses contain the UI's `location: {city, country}`, `photos` URL lis
 This is an implementation inventory, not an approved retention policy or legal advice. Retention periods, deletion commitments, and support ownership still need product and qualified legal review before launch.
 
 * Account and profile records include email, display name, age, gender, city/country, bio, interests, discovery preferences, visibility, referral attribution, verification status, and activity timestamps. Public profile responses omit account email, private preferences, and activity timestamps. These records are stored in the application database.
-* Matches, messages, posts, comments, likes, event RSVPs, prompt answers, notifications, blocks, and reports are database records associated with accounts. Daily prompts are private to the responding account. Reports are available to the reporting user in the Safety Center; a dedicated staff moderation workflow is not yet implemented.
+* Matches, messages, posts, comments, likes, event RSVPs, prompt answers, notifications, blocks, and reports are database records associated with accounts. Daily prompts are private to the responding account. Reports are available to the reporting user in the Safety Center; staff case access is restricted to the `Moderators` group and superusers.
 * Media bytes are uploaded directly to Cloudflare R2. The database stores media URLs; R2 object keys include the owning account UUID and a random identifier. Removing a profile-photo or post record does not delete its R2 object. Story expiry currently hides stories from active listings after 24 hours; it does not automatically delete the database row or media object.
 * The application has no user-facing account deletion endpoint or configured support contact. Settings currently says account deletion is unavailable. Do not promise self-service deletion or direct users to the example VAPID sender email as support.
 * Most account-related database rows use cascading deletion, referral attribution is nulled when a referrer is deleted, and creator-earning records use protected relations that can prevent account deletion. Deleting a database row would not by itself remove R2 objects or establish when data expires from provider backups.

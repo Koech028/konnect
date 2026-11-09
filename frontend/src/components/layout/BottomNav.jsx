@@ -2,7 +2,7 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import { Home, Search, MessageCircle, User, PlusCircle, Video, Film } from 'lucide-react'
 
 const navItems = [
-  { path: '/', icon: Home, label: 'Feed' },
+  { path: '/feed', icon: Home, label: 'Feed' },
   { path: '/discover', icon: Search, label: 'Discover' },
   { path: '/shorts', icon: Film, label: 'Shorts' },
   { path: '/live', icon: Video, label: 'Live' },
@@ -16,7 +16,6 @@ export default function BottomNav() {
   const navigate = useNavigate()
 
   const isActive = (path) => {
-    if (path === '/') return location.pathname === '/'
     return location.pathname.startsWith(path)
   }
 

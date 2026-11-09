@@ -3,6 +3,8 @@ import { useNavigate, Link, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { Eye, EyeOff, Mail, Lock, User, Calendar, MapPin } from 'lucide-react'
 
+const countWords = value => value.trim().split(/\s+/).filter(Boolean).length
+
 export default function SignupPage() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
@@ -37,6 +39,10 @@ export default function SignupPage() {
       }
       setError('')
       setStep(step + 1)
+      return
+    }
+    if (step === 4 && countWords(formData.bio) > 100) {
+      setError('Your bio must be 100 words or fewer.')
       return
     }
     setIsLoading(true)
@@ -383,14 +389,13 @@ export default function SignupPage() {
                 color: 'var(--color-text-secondary)',
                 marginBottom: '8px'
               }}>
-                A little about you (optional)
+                Bio (optional)
               </label>
               <textarea
                 id="signup-bio"
                 value={formData.bio}
                 onChange={(e) => handleChange('bio', e.target.value)}
-                placeholder="Share what you enjoy and who you hope to meet"
-                maxLength={500}
+                placeholder="Write freely about yourself, your interests, or what you'd like others to know."
                 rows={4}
                 style={{
                   width: '100%',
@@ -404,6 +409,9 @@ export default function SignupPage() {
                   color: 'var(--color-text-primary)'
                 }}
               />
+              <p style={{ margin: '6px 0 0', textAlign: 'right', fontSize: 12, color: countWords(formData.bio) > 100 ? 'var(--color-error)' : 'var(--color-text-muted)' }}>
+                {countWords(formData.bio)}/100 words
+              </p>
             </div>
             <div style={{ marginBottom: 'var(--space-lg)' }}>
               <label htmlFor="signup-interests" style={{

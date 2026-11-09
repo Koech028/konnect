@@ -1,6 +1,8 @@
 import secrets
+import smtplib
 from datetime import timedelta
 
+from django.conf import settings
 from django.contrib.auth.hashers import check_password, make_password
 from django.core.mail import send_mail
 from django.db import transaction
@@ -17,6 +19,8 @@ def has_recent_code(user, purpose):
     return EmailVerificationCode.objects.filter(
         user=user,
         purpose=purpose,
+        consumed_at__isnull=True,
+        expires_at__gt=timezone.now(),
         created_at__gte=timezone.now() - CODE_RESEND_DELAY,
     ).exists()
 
@@ -29,7 +33,7 @@ def send_email_code(user, purpose):
         purpose=purpose,
         consumed_at__isnull=True,
     ).update(consumed_at=now)
-    EmailVerificationCode.objects.create(
+    challenge = EmailVerificationCode.objects.create(
         user=user,
         purpose=purpose,
         code_hash=make_password(code),
@@ -39,21 +43,27 @@ def send_email_code(user, purpose):
     if purpose == EmailVerificationCode.Purpose.SIGNUP:
         subject = 'Verify your LinkUp email'
         purpose_text = 'verify your email address'
+        code_label = 'verification'
     else:
         subject = 'Your LinkUp password reset code'
         purpose_text = 'reset your password'
+        code_label = 'password reset'
 
-    send_mail(
-        subject=subject,
-        message=(
-            f'Your LinkUp verification code is {code}.\n\n'
-            f'Enter this code to {purpose_text}. It expires in 10 minutes. '
-            'If you did not request this, you can ignore this email.'
-        ),
-        from_email=None,
-        recipient_list=[user.email],
-        fail_silently=False,
-    )
+    try:
+        send_mail(
+            subject=subject,
+            message=(
+                f'Your LinkUp {code_label} code is {code}.\n\n'
+                f'Enter this code to {purpose_text}. It expires in 10 minutes. '
+                'If you did not request this, you can ignore this email.'
+            ),
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            recipient_list=[user.email],
+            fail_silently=False,
+        )
+    except (OSError, smtplib.SMTPException):
+        challenge.delete()
+        raise
 
 
 def consume_email_code(user, purpose, submitted_code):

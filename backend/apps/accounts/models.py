@@ -57,7 +57,7 @@ class User(AbstractUser):
     display_name = models.CharField(max_length=40)
     age = models.PositiveSmallIntegerField(validators=[MinValueValidator(18), MaxValueValidator(100)])
     gender = models.CharField(max_length=20, choices=Gender.choices)
-    bio = models.CharField(max_length=500, blank=True)
+    bio = models.TextField(blank=True)
     city = models.CharField(max_length=100, blank=True)
     country = models.CharField(max_length=100, blank=True, default='Kenya')
     avatar_url = models.URLField(blank=True)
