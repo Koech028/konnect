@@ -3,6 +3,7 @@ import { useAuth } from '../../context/AuthContext'
 import { useNavigate } from 'react-router-dom'
 import Avatar from '../common/Avatar'
 import Badge from '../common/Badge'
+import ImagePreview from '../common/ImagePreview'
 
 export default function ProfileHeader({ user, isOwnProfile = false, onEdit, onLike, liked = false, onSafety }) {
   const { user: currentUser } = useAuth()
@@ -26,11 +27,13 @@ export default function ProfileHeader({ user, isOwnProfile = false, onEdit, onLi
         position: 'relative'
       }}>
         {profileUser.cover_image_url && (
-          <img
+          <ImagePreview
             src={profileUser.cover_image_url}
-            alt="Cover"
-            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-          />
+            alt={`${profileUser.display_name}'s cover picture`}
+            triggerStyle={{ width: '100%', height: '100%' }}
+          >
+            <img src={profileUser.cover_image_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+          </ImagePreview>
         )}
         {isOwnProfile && (
           <button onClick={() => navigate('/profile/edit')} aria-label="Edit cover picture" style={{
@@ -68,7 +71,7 @@ export default function ProfileHeader({ user, isOwnProfile = false, onEdit, onLi
           padding: '4px',
           background: 'var(--color-surface)'
         }}>
-          <Avatar src={profileUser.avatar} alt={profileUser.display_name} size="2xl" />
+          <Avatar src={profileUser.avatar} alt={profileUser.display_name} size="2xl" preview />
         </div>
 
         {isOwnProfile ? (

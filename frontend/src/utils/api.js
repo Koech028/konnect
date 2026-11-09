@@ -30,7 +30,12 @@ async function refreshAccessToken() {
 }
 
 function getErrorMessage(body, status) {
-  if (typeof body === 'string' && body) return body
+  if (typeof body === 'string' && body) {
+    if (/<\s*(?:!doctype\s+html|html|head|body)\b/i.test(body)) {
+      return `The server returned an unexpected page (${status}). Please try again later.`
+    }
+    return body
+  }
   if (body && typeof body === 'object') {
     if (typeof body.detail === 'string') return body.detail
     return Object.entries(body)

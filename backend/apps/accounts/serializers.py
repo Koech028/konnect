@@ -4,6 +4,12 @@ from rest_framework import serializers
 from apps.accounts.models import User
 
 
+def validate_bio_word_count(value):
+    if len(value.split()) > 100:
+        raise serializers.ValidationError('Bio must be 100 words or fewer.')
+    return value
+
+
 class UserSerializer(serializers.ModelSerializer):
     location = serializers.SerializerMethodField()
     photos = serializers.SerializerMethodField()
@@ -40,6 +46,7 @@ class UserSerializer(serializers.ModelSerializer):
 
 class RegistrationSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, validators=[validate_password])
+    bio = serializers.CharField(required=False, allow_blank=True, trim_whitespace=True)
     referral_code = serializers.CharField(write_only=True, required=False, allow_blank=True, max_length=32)
     city = serializers.CharField(write_only=True, required=False, allow_blank=True)
     country = serializers.CharField(write_only=True, required=False, allow_blank=True)
@@ -67,6 +74,9 @@ class RegistrationSerializer(serializers.ModelSerializer):
         if User.objects.filter(email__iexact=value).exists():
             raise serializers.ValidationError('An account with this email already exists.')
         return value
+
+    def validate_bio(self, value):
+        return validate_bio_word_count(value)
 
     def validate(self, attrs):
         location = attrs.pop('location', {})

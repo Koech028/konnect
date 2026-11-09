@@ -4,7 +4,7 @@ from django.test import override_settings
 from rest_framework.test import APITestCase
 
 from apps.accounts.models import User
-from apps.notifications.models import PushSubscription
+from apps.notifications.models import Notification, PushSubscription
 from apps.notifications.services import deliver_web_push
 
 
@@ -49,6 +49,32 @@ class PushNotificationApiTests(APITestCase):
         self.assertEqual(removed.status_code, 204)
         self.assertFalse(PushSubscription.objects.exists())
 
+    def test_unread_count_updates_when_notifications_are_read(self):
+        unread = Notification.objects.create(
+            recipient=self.user,
+            type='message',
+            body='Unread notification.',
+        )
+        Notification.objects.create(
+            recipient=self.user,
+            type='match',
+            body='Already read notification.',
+            read=True,
+        )
+        Notification.objects.create(
+            recipient=self.other,
+            type='message',
+            body='Another user notification.',
+        )
+
+        count = self.client.get('/api/v1/notifications/unread-count/')
+        self.assertEqual(count.data, {'count': 1})
+
+        self.client.post(f'/api/v1/notifications/{unread.id}/read/', {})
+        self.assertEqual(
+            self.client.get('/api/v1/notifications/unread-count/').data,
+            {'count': 0},
+        )
     def test_push_config_exposes_only_the_public_key(self):
         with override_settings(VAPID_PUBLIC_KEY='public-vapid-key', VAPID_PRIVATE_KEY='private-vapid-key'):
             response = self.client.get('/api/v1/settings/push/config/')

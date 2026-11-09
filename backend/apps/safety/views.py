@@ -56,7 +56,7 @@ class ContentReportViewSet(viewsets.GenericViewSet):
 
     def get_queryset(self):
         return ContentReport.objects.filter(reporter=self.request.user).select_related(
-            'short', 'comment', 'comment__short'
+            'short', 'comment', 'comment__short', 'offer', 'offer__host'
         )
 
     def list(self, request):

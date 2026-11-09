@@ -1,6 +1,7 @@
 import { MapPin, Heart } from 'lucide-react'
 import Avatar from '../common/Avatar'
 import Badge from '../common/Badge'
+import ImagePreview from '../common/ImagePreview'
 import { useNavigate } from 'react-router-dom'
 
 export default function ProfileCard({ user, onLike, liked, liking = false }) {
@@ -32,23 +33,28 @@ export default function ProfileCard({ user, onLike, liked, liking = false }) {
         background: 'linear-gradient(135deg, var(--color-primary-soft), var(--color-secondary-soft))',
         position: 'relative'
       }}>
-        <img
-          src={user.photos[0]}
-          alt={user.display_name}
-          style={{
-            width: '100%',
-            height: '100%',
-            objectFit: 'cover'
-          }}
-          loading="lazy"
-        />
+        {(user.photos?.[0] || user.cover_image_url || user.avatar) && (
+          <ImagePreview
+            src={user.photos?.[0] || user.cover_image_url || user.avatar}
+            alt={`${user.display_name}'s profile picture`}
+            triggerStyle={{ width: '100%', height: '100%' }}
+          >
+            <img
+              src={user.photos?.[0] || user.cover_image_url || user.avatar}
+              alt=""
+              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+              loading="lazy"
+            />
+          </ImagePreview>
+        )}
         <div style={{
           position: 'absolute',
           bottom: 0,
           left: 0,
           right: 0,
           height: '60px',
-          background: 'linear-gradient(transparent, rgba(0,0,0,0.4))'
+          background: 'linear-gradient(transparent, rgba(0,0,0,0.4))',
+          pointerEvents: 'none'
         }} />
       </div>
 
@@ -66,7 +72,7 @@ export default function ProfileCard({ user, onLike, liked, liking = false }) {
           padding: '3px',
           background: 'var(--color-surface)'
         }}>
-          <Avatar src={user.avatar} alt={user.display_name} size="lg" />
+          <Avatar src={user.avatar} alt={user.display_name} size="lg" preview />
         </div>
         <button
           onClick={(e) => {

@@ -1,8 +1,14 @@
+from django.contrib.admin.models import CHANGE, LogEntry
+from django.contrib.admin.sites import AdminSite
+from django.contrib.auth.models import Group
+from django.test import RequestFactory
 from rest_framework.test import APITestCase
 
+from apps.accounts.admin import LinkUpUserAdmin
 from apps.accounts.models import User
 from apps.community.models import Short
-from apps.safety.models import ContentReport
+from apps.safety.admin import MODERATOR_GROUP_NAME, ReportAdmin
+from apps.safety.models import ContentReport, ModerationAuditEvent, Report
 
 
 class SafetyApiTests(APITestCase):
@@ -120,3 +126,67 @@ class SafetyApiTests(APITestCase):
             'reason': 'other',
         }, format='json')
         self.assertEqual(missing_target.status_code, 400)
+
+    def test_moderator_can_review_reports_but_cannot_manage_users(self):
+        moderator = User.objects.create_user(
+            email='staff@example.com',
+            password='Mango!Sunrise_2026',
+            display_name='Staff Moderator',
+            age=35,
+            gender='other',
+            is_staff=True,
+        )
+        moderator.groups.add(Group.objects.get(name=MODERATOR_GROUP_NAME))
+        report = Report.objects.create(
+            reporter=self.reporter,
+            reported_user=self.target,
+            reason=Report.Reason.OTHER,
+        )
+        request = RequestFactory().post('/admin/safety/report/')
+        request.user = moderator
+
+        report_admin = ReportAdmin(Report, AdminSite())
+        user_admin = LinkUpUserAdmin(User, AdminSite())
+        self.assertTrue(report_admin.has_view_permission(request))
+        self.assertTrue(report_admin.has_change_permission(request))
+        self.assertFalse(report_admin.has_add_permission(request))
+        self.assertFalse(report_admin.has_delete_permission(request))
+        self.assertFalse(user_admin.has_module_permission(request))
+        self.assertFalse(user_admin.has_view_permission(request))
+        self.assertFalse(user_admin.has_change_permission(request))
+
+        unassigned_staff = User.objects.create_user(
+            email='unassigned-staff@example.com',
+            password='Mango!Sunrise_2026',
+            display_name='Unassigned Staff',
+            age=33,
+            gender='other',
+            is_staff=True,
+        )
+        request.user = unassigned_staff
+        self.assertFalse(report_admin.has_module_permission(request))
+        self.assertFalse(report_admin.has_view_permission(request))
+
+        request.user = moderator
+        report_admin.close_selected(request, Report.objects.filter(pk=report.pk))
+
+        report.refresh_from_db()
+        self.assertEqual(report.status, Report.Status.CLOSED)
+        self.assertEqual(report.reviewed_by, moderator)
+        self.assertIsNotNone(report.reviewed_at)
+        audit_event = ModerationAuditEvent.objects.get(case_id=report.pk)
+        self.assertEqual(audit_event.actor, moderator)
+        self.assertEqual(audit_event.case_type, ModerationAuditEvent.CaseType.USER_REPORT)
+        self.assertEqual(audit_event.previous_status, Report.Status.OPEN)
+        self.assertEqual(audit_event.new_status, Report.Status.CLOSED)
+        self.assertTrue(LogEntry.objects.filter(
+            user=moderator,
+            object_id=str(report.pk),
+            action_flag=CHANGE,
+        ).exists())
+
+        report_admin.claim_selected(request, Report.objects.filter(pk=report.pk))
+        report.refresh_from_db()
+        self.assertEqual(report.status, Report.Status.CLOSED)
+        self.assertIsNone(report.assigned_to)
+        self.assertEqual(ModerationAuditEvent.objects.filter(case_id=report.pk).count(), 1)

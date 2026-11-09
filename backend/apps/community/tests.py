@@ -5,10 +5,14 @@ from django.utils.dateparse import parse_datetime
 from rest_framework.test import APITestCase
 
 from apps.accounts.models import User
+from apps.notifications.models import Notification
 from apps.community.models import (
+    ActivityOffer,
     DailyPromptResponse,
     DatingEvent,
     EventRSVP,
+    OfferConversation,
+    OfferMessage,
     Short,
     ShortComment,
     ShortView,
@@ -238,3 +242,195 @@ class CommunityApiTests(APITestCase):
 
         self.assertEqual(self.client.get('/api/v1/events/').data, [])
         self.assertEqual(self.client.get(f'/api/v1/events/{event.id}/').status_code, 404)
+
+    def create_offer(self, host=None, **overrides):
+        starts_at = timezone.now() + timedelta(days=2)
+        payload = {
+            'category': 'hangout',
+            'title': 'Coffee and board games',
+            'description': 'A relaxed afternoon.',
+            'city': 'Nairobi',
+            'location': 'Public cafe, Garden City',
+            'starts_at': starts_at.isoformat(),
+            'ends_at': (starts_at + timedelta(hours=3)).isoformat(),
+            'image_url': 'https://media.example.com/cafe.jpg',
+            'activities': ['Coffee', 'Board games'],
+            'boundaries': 'Public venue only; no smoking.',
+            'price_ksh': 0,
+            'lunch_expectation': 'no_expectation',
+        }
+        payload.update(overrides)
+        if host is not None:
+            self.client.force_authenticate(host)
+        return self.client.post('/api/v1/offers/', payload, format='json')
+
+    def test_activity_offers_validate_publish_filter_and_hide_inactive_profiles(self):
+        published = self.create_offer()
+        self.assertEqual(published.status_code, 201, published.data)
+        self.assertEqual(published.data['price_ksh'], 0)
+        self.assertEqual(published.data['host_id'], str(self.viewer.id))
+        self.assertEqual(published.data['activities'], ['Coffee', 'Board games'])
+        self.assertEqual(published.data['lunch_expectation'], 'no_expectation')
+
+        paid = self.create_offer(
+            host=self.host,
+            category='service',
+            title='Public venue massage service',
+            price_ksh=2500,
+            lunch_expectation='guest_pays',
+            city='Nairobi',
+        )
+        self.assertEqual(paid.status_code, 201, paid.data)
+        self.client.force_authenticate(self.viewer)
+        self.assertEqual(len(self.client.get('/api/v1/offers/?city=Nairobi').data), 2)
+        self.assertEqual(
+            [offer['id'] for offer in self.client.get('/api/v1/offers/?price=paid').data],
+            [paid.data['id']],
+        )
+        self.assertEqual(
+            [offer['id'] for offer in self.client.get('/api/v1/offers/?category=service').data],
+            [paid.data['id']],
+        )
+        self.assertEqual(self.client.get('/api/v1/offers/?category=invalid').status_code, 400)
+        self.assertEqual(self.client.get('/api/v1/offers/?date=not-a-date').status_code, 400)
+
+        self.host.profile_status = User.ProfileStatus.HIDDEN
+        self.host.save(update_fields=('profile_status',))
+        self.assertEqual(
+            self.client.get(f"/api/v1/offers/{paid.data['id']}/").status_code,
+            404,
+        )
+        self.assertNotIn(paid.data['id'], [
+            offer['id'] for offer in self.client.get('/api/v1/offers/').data
+        ])
+
+    def test_activity_offer_requires_clear_terms_and_future_public_meetup(self):
+        missing_lunch_expectation = self.create_offer(lunch_expectation=None)
+        self.assertEqual(missing_lunch_expectation.status_code, 400)
+
+        missing_boundaries = self.create_offer(boundaries='')
+        self.assertEqual(missing_boundaries.status_code, 400)
+
+        private_location = self.create_offer(location='')
+        self.assertEqual(private_location.status_code, 400)
+
+        past = self.create_offer(
+            starts_at=(timezone.now() - timedelta(hours=1)).isoformat(),
+            ends_at=(timezone.now() + timedelta(hours=1)).isoformat(),
+        )
+        self.assertEqual(past.status_code, 400)
+
+    def test_activity_offer_owner_can_edit_and_deactivate_only_their_own(self):
+        self.client.force_authenticate(self.host)
+        offer = self.create_offer().data
+        self.client.force_authenticate(self.viewer)
+        forbidden = self.client.patch(
+            f"/api/v1/offers/{offer['id']}/",
+            {'title': 'Hijacked'},
+            format='json',
+        )
+        self.assertEqual(forbidden.status_code, 404)
+
+        self.client.force_authenticate(self.host)
+        updated = self.client.patch(
+            f"/api/v1/offers/{offer['id']}/",
+            {'price_ksh': 500, 'lunch_expectation': 'optional'},
+            format='json',
+        )
+        self.assertEqual(updated.status_code, 200, updated.data)
+        self.assertEqual(updated.data['price_ksh'], 500)
+
+        deactivated = self.client.delete(f"/api/v1/offers/{offer['id']}/")
+        self.assertEqual(deactivated.status_code, 204)
+        self.assertFalse(ActivityOffer.objects.get(pk=offer['id']).is_active)
+        self.assertEqual(self.client.get('/api/v1/offers/').data, [])
+
+    def test_offer_messages_work_without_a_match_and_respect_blocks(self):
+        self.client.force_authenticate(self.host)
+        offer_response = self.create_offer()
+        self.assertEqual(offer_response.status_code, 201)
+        offer_id = offer_response.data['id']
+
+        self.client.force_authenticate(self.viewer)
+        started = self.client.post(
+            f'/api/v1/offers/{offer_id}/messages/',
+            {'text': 'I would like to join. Is the cafe accessible?'},
+            format='json',
+        )
+        self.assertEqual(started.status_code, 201, started.data)
+        conversation_id = started.data['conversation']['id']
+        self.assertEqual(OfferConversation.objects.count(), 1)
+        self.assertEqual(OfferMessage.objects.count(), 1)
+        self.assertTrue(Notification.objects.filter(
+            recipient=self.host,
+            target_type='offer_conversation',
+            target_id=conversation_id,
+        ).exists())
+
+        stranger = User.objects.create_user(
+            email='community-stranger@example.com',
+            password='Mango!Sunrise_2026',
+            display_name='Stranger',
+            age=30,
+            gender='woman',
+        )
+        self.client.force_authenticate(stranger)
+        self.assertEqual(
+            self.client.get(f'/api/v1/offers/conversations/{conversation_id}/messages/').status_code,
+            404,
+        )
+
+        self.client.force_authenticate(self.host)
+        inbox = self.client.get('/api/v1/offers/conversations/')
+        self.assertEqual(len(inbox.data), 1)
+        self.assertEqual(inbox.data[0]['other_user_id'], str(self.viewer.id))
+        self.assertEqual(inbox.data[0]['unread_count'], 1)
+        host_history = self.client.get(
+            f'/api/v1/offers/conversations/{conversation_id}/messages/',
+        )
+        self.assertEqual(len(host_history.data), 1)
+        self.assertIsNotNone(host_history.data[0]['read_at'])
+        reply = self.client.post(
+            f'/api/v1/offers/conversations/{conversation_id}/messages/',
+            {'text': 'Yes, the cafe has step-free access.'},
+            format='json',
+        )
+        self.assertEqual(reply.status_code, 201, reply.data)
+
+        self.client.force_authenticate(self.viewer)
+        history = self.client.get(f'/api/v1/offers/conversations/{conversation_id}/messages/')
+        self.assertEqual(len(history.data), 2)
+        initial = next(message for message in history.data if message['sender_id'] == str(self.viewer.id))
+        self.assertIsNotNone(initial['read_at'])
+        self.client.force_authenticate(self.host)
+        self.assertEqual(
+            self.client.get(f'/api/v1/offers/conversations/{conversation_id}/messages/').status_code,
+            200,
+        )
+        self.host.blocks_created.create(blocked=self.viewer)
+        self.assertEqual(
+            self.client.get(f'/api/v1/offers/conversations/{conversation_id}/messages/').status_code,
+            404,
+        )
+        self.assertEqual(self.client.get('/api/v1/offers/conversations/').data, [])
+
+    def test_offer_can_be_reported_once_and_report_remains_private(self):
+        self.client.force_authenticate(self.host)
+        offer = self.create_offer().data
+        self.client.force_authenticate(self.viewer)
+        report = self.client.post('/api/v1/safety/content-reports/', {
+            'offer': offer['id'],
+            'reason': 'inappropriate',
+            'details': 'The listing asks people to meet at a private residence.',
+        }, format='json')
+        self.assertEqual(report.status_code, 201, report.data)
+        self.assertEqual(report.data['offer_id'], offer['id'])
+        self.assertEqual(self.client.get('/api/v1/safety/content-reports/').data[0]['offer_id'], offer['id'])
+
+        duplicate = self.client.post('/api/v1/safety/content-reports/', {
+            'offer': offer['id'],
+            'reason': 'spam',
+        }, format='json')
+        self.assertEqual(duplicate.status_code, 400)
+        self.client.force_authenticate(self.host)
+        self.assertEqual(self.client.get('/api/v1/safety/content-reports/').data, [])

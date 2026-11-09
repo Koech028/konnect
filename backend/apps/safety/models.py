@@ -38,6 +38,22 @@ class Report(models.Model):
     reason = models.CharField(max_length=30, choices=Reason.choices)
     details = models.CharField(max_length=1000, blank=True)
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.OPEN)
+    assigned_to = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='assigned_user_reports',
+    )
+    review_notes = models.TextField(blank=True)
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+    reviewed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='reviewed_user_reports',
+    )
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -76,9 +92,32 @@ class ContentReport(models.Model):
         blank=True,
         related_name='reports',
     )
+    offer = models.ForeignKey(
+        'community.ActivityOffer',
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name='reports',
+    )
     reason = models.CharField(max_length=30, choices=Reason.choices)
     details = models.CharField(max_length=1000, blank=True)
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.OPEN)
+    assigned_to = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='assigned_content_reports',
+    )
+    review_notes = models.TextField(blank=True)
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+    reviewed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='reviewed_content_reports',
+    )
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -86,8 +125,9 @@ class ContentReport(models.Model):
         constraints = [
             models.CheckConstraint(
                 condition=(
-                    Q(short__isnull=False, comment__isnull=True)
-                    | Q(short__isnull=True, comment__isnull=False)
+                    Q(short__isnull=False, comment__isnull=True, offer__isnull=True)
+                    | Q(short__isnull=True, comment__isnull=False, offer__isnull=True)
+                    | Q(short__isnull=True, comment__isnull=True, offer__isnull=False)
                 ),
                 name='content_report_has_one_target',
             ),
@@ -101,4 +141,39 @@ class ContentReport(models.Model):
                 condition=Q(comment__isnull=False),
                 name='unique_comment_report_per_user',
             ),
+            models.UniqueConstraint(
+                fields=('reporter', 'offer'),
+                condition=Q(offer__isnull=False),
+                name='unique_offer_report_per_user',
+            ),
+        ]
+
+
+class ModerationAuditEvent(models.Model):
+    class CaseType(models.TextChoices):
+        USER_REPORT = 'report', 'User report'
+        CONTENT_REPORT = 'content_report', 'Content report'
+        VERIFICATION = 'verification', 'Verification request'
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    case_type = models.CharField(max_length=30, choices=CaseType.choices)
+    case_id = models.UUIDField()
+    actor = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='moderation_actions',
+    )
+    action = models.CharField(max_length=32)
+    details = models.TextField(blank=True)
+    previous_status = models.CharField(max_length=20, blank=True)
+    new_status = models.CharField(max_length=20, blank=True)
+    review_notes = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ('-created_at',)
+        indexes = [
+            models.Index(fields=('case_type', 'case_id', 'created_at'), name='moderation_case_history_idx'),
         ]

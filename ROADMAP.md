@@ -58,21 +58,21 @@ Complete these items in order.
 
 - [x] Review account, profile, referral, and media data handling; document retention, user support, and account deletion expectations. Review documented in `backend/README.md` on 2026-10-30; retention periods, real support contact, deletion workflow, and R2 cleanup remain launch blockers pending owner and qualified legal review.
 - [ ] Confirm deployed secrets, HTTPS, database backups and restore procedure, monitoring, error reporting, and operational ownership.
-- [ ] Test email delivery, password reset, upload permissions, rate limits, and database migration procedure in the deployment environment.
+- [ ] Test email delivery, password reset, upload permissions, rate limits, and database migration procedure in the deployment environment. Added an automated production preflight and verified SMTP password-reset delivery; hosted upload, rate-limit, and migration checks remain to be run.
 - [ ] Resolve launch-blocking defects and verify the core user journeys on supported mobile and desktop browsers.
 
 **Done when:** a deployment checklist is completed, a backup restore is tested, and critical user journeys and operational alerts have been verified in the target environment.
 
 ### 6. Moderator and admin experience (last core feature)
 
-- [ ] Build a dedicated, staff-only moderation workflow for user and content reports, verification requests, and escalations.
-- [ ] Use role-based permissions so moderators receive only the access needed for their responsibilities.
-- [ ] Provide clear case status, assignment/ownership, decision notes, and safe next actions.
-- [ ] Keep an auditable record of staff decisions and relevant changes; restrict access to sensitive information.
-- [ ] Add tests for authorization, workflow transitions, audit history, and notification outcomes.
+- [ ] Build a dedicated, staff-only moderation workflow for user and content reports, verification requests, and escalations. User/content report and verification queues are implemented; escalations remain outstanding.
+- [x] Use role-based permissions so moderators receive only the access needed for their responsibilities.
+- [x] Provide clear case status, assignment/ownership, decision notes, and safe next actions.
+- [x] Keep an auditable record of staff decisions and relevant changes; restrict access to sensitive information.
+- [x] Add tests for authorization, workflow transitions, audit history, and notification outcomes.
 - [ ] Document moderator procedures for reports, appeals/escalations, and verification decisions.
 
-**Done when:** authorized staff can process the core moderation queues reliably, unauthorized roles cannot perform restricted actions, and actions are auditable. This is intentionally the final core feature.
+**In progress:** 2026-11-09, at the user's request before completing item 5. Added a pre-created `Moderators` role, superuser-only account/group management, restricted report/content/verification queues, assignment and review-note fields, logged admin actions, verification notifications, and focused authorization/audit tests. Escalations, appeals procedures, and retention policies remain outstanding. This is intentionally the final core feature; item 5 remains outstanding.
 
 ## Advanced
 
@@ -103,5 +103,6 @@ The current 100-credit/KSh 50 rate and 80/20 creator/platform split are planning
 ### D. Expanded live and community experiences
 
 - [ ] Consider live moderation controls, audience management, and reporting improvements.
+- [x] Add a separate activity-offer board for dated hangouts and services, with filters, clear KSh/lunch terms, direct messaging without a match, and reporting/block controls. Completed 2026-11-09: advertised prices are off-platform only; offers require a public venue and date/time availability.
 - [ ] Explore additional community formats or creator tools only after safety and operational capacity are ready.
 - [ ] Add analytics for live participation and retention without collecting unnecessary personal data.

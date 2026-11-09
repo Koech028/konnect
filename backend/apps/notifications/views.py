@@ -16,6 +16,10 @@ class NotificationViewSet(viewsets.ReadOnlyModelViewSet):
     def get_queryset(self):
         return Notification.objects.filter(recipient=self.request.user).select_related('actor').prefetch_related('actor__profile_photos')
 
+    def unread_count(self, request):
+        count = self.get_queryset().filter(read=False).count()
+        return Response({'count': count})
+
     def mark_read(self, request, pk=None):
         notification = get_object_or_404(self.get_queryset(), pk=pk)
         notification.read = True

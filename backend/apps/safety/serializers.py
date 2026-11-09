@@ -66,50 +66,52 @@ class ReportSerializer(serializers.ModelSerializer):
 class ContentReportSerializer(serializers.ModelSerializer):
     short_id = serializers.UUIDField(source='short.id', read_only=True)
     comment_id = serializers.UUIDField(source='comment.id', read_only=True)
+    offer_id = serializers.UUIDField(source='offer.id', read_only=True)
     short = serializers.UUIDField(write_only=True, required=False)
     comment = serializers.UUIDField(write_only=True, required=False)
+    offer = serializers.UUIDField(write_only=True, required=False)
 
     class Meta:
         model = ContentReport
         fields = (
-            'id', 'short_id', 'comment_id', 'short', 'comment',
+            'id', 'short_id', 'comment_id', 'offer_id', 'short', 'comment', 'offer',
             'reason', 'details', 'status', 'created_at',
         )
-        read_only_fields = ('id', 'short_id', 'comment_id', 'status', 'created_at')
+        read_only_fields = ('id', 'short_id', 'comment_id', 'offer_id', 'status', 'created_at')
         extra_kwargs = {
             'details': {'required': False, 'allow_blank': True},
         }
 
     def validate(self, attrs):
-        from apps.community.models import Short, ShortComment
+        from apps.community.models import ActivityOffer, Short, ShortComment
 
         has_short = 'short' in attrs
         has_comment = 'comment' in attrs
-        if has_short == has_comment:
-            raise serializers.ValidationError('Report either a Short or a comment.')
+        has_offer = 'offer' in attrs
+        if sum((has_short, has_comment, has_offer)) != 1:
+            raise serializers.ValidationError('Report one Short, comment, or offer.')
 
-        target_model = Short if has_short else ShortComment
-        target_id = attrs.pop('short' if has_short else 'comment')
+        target_field = 'short' if has_short else 'comment' if has_comment else 'offer'
+        target_model = Short if has_short else ShortComment if has_comment else ActivityOffer
+        target_id = attrs.pop(target_field)
         target = target_model.objects.filter(pk=target_id).first()
         if target is None:
             raise serializers.ValidationError('This content is no longer available.')
-        short = target if has_short else target.short
+        short = target if has_short else target.short if has_comment else None
+        content_author = target.author if has_comment else short.author if has_short else target.host
         request = self.context['request']
-        if not short.author.is_active or short.author.profile_status != 'active':
+        if not content_author.is_active or content_author.profile_status != 'active':
             raise serializers.ValidationError('This content is no longer available.')
         if Block.objects.filter(
-            Q(blocker=request.user, blocked=short.author)
-            | Q(blocker=short.author, blocked=request.user)
+            Q(blocker=request.user, blocked=content_author)
+            | Q(blocker=content_author, blocked=request.user)
         ).exists():
             raise serializers.ValidationError('This content is no longer available.')
-        content_author = target.author if has_comment else short.author
         if content_author.id == request.user.id:
             raise serializers.ValidationError('You cannot report your own content.')
-        if not has_short:
-            attrs['comment'] = target
-        else:
-            attrs['short'] = target
-        target_field = 'short' if has_short else 'comment'
+        if has_offer and not target.is_active:
+            raise serializers.ValidationError('This content is no longer available.')
+        attrs[target_field] = target
         if ContentReport.objects.filter(
             reporter=request.user,
             **{target_field: target},

@@ -4,15 +4,19 @@ from django.db import IntegrityError, transaction
 from django.db.models import Count, Q
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
+from django.utils.dateparse import parse_date
 from rest_framework import status, throttling
 from rest_framework.exceptions import NotFound, PermissionDenied, ValidationError
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.community.models import (
+    ActivityOffer,
     DailyPromptResponse,
     DatingEvent,
     EventRSVP,
+    OfferConversation,
+    OfferMessage,
     Short,
     ShortComment,
     ShortLike,
@@ -20,10 +24,13 @@ from apps.community.models import (
     Story,
 )
 from apps.community.serializers import (
+    ActivityOfferSerializer,
     CreateShortSerializer,
     CreateStorySerializer,
     DailyPromptResponseSerializer,
     DatingEventSerializer,
+    OfferConversationSerializer,
+    OfferMessageSerializer,
     ShortCommentSerializer,
     ShortSerializer,
     StorySerializer,
@@ -290,3 +297,222 @@ class EventDetailView(APIView):
             'attending': attending,
             'attendee_count': event.rsvps.count(),
         })
+
+
+class ActivityOfferListCreateView(APIView):
+    throttle_classes = (throttling.ScopedRateThrottle,)
+    throttle_scope = 'offer-write'
+
+    def get_throttles(self):
+        return super().get_throttles() if self.request.method == 'POST' else []
+
+    def get(self, request):
+        offers = ActivityOffer.objects.filter(
+            is_active=True,
+            starts_at__gte=timezone.now(),
+            host__is_active=True,
+            host__profile_status='active',
+        ).exclude(host_id__in=blocked_user_ids(request.user)).select_related('host')
+        city = request.query_params.get('city', '').strip()
+        if city:
+            offers = offers.filter(city__iexact=city)
+        category = request.query_params.get('category', '').strip()
+        if category:
+            if category not in ActivityOffer.Category.values:
+                raise ValidationError({'category': 'Choose hangout or service.'})
+            offers = offers.filter(category=category)
+        price = request.query_params.get('price', '').strip()
+        if price == 'free':
+            offers = offers.filter(price_ksh=0)
+        elif price == 'paid':
+            offers = offers.filter(price_ksh__gt=0)
+        elif price:
+            raise ValidationError({'price': 'Choose free or paid.'})
+        date = request.query_params.get('date', '').strip()
+        if date:
+            selected_date = parse_date(date)
+            if selected_date is None:
+                raise ValidationError({'date': 'Use YYYY-MM-DD.'})
+            offers = offers.filter(starts_at__date=selected_date)
+        return Response(ActivityOfferSerializer(offers[:100], many=True, context={'request': request}).data)
+
+    def post(self, request):
+        if not request.user.is_active or request.user.profile_status != 'active':
+            raise PermissionDenied('Your account must be active to publish an offer.')
+        serializer = ActivityOfferSerializer(data=request.data, context={'request': request})
+        serializer.is_valid(raise_exception=True)
+        offer = serializer.save()
+        return Response(
+            ActivityOfferSerializer(offer, context={'request': request}).data,
+            status=status.HTTP_201_CREATED,
+        )
+
+
+class ActivityOfferDetailView(APIView):
+    throttle_classes = (throttling.ScopedRateThrottle,)
+    throttle_scope = 'offer-write'
+
+    def get_throttles(self):
+        return super().get_throttles() if self.request.method in ('PATCH', 'DELETE') else []
+
+    def get(self, request, pk):
+        offer = get_object_or_404(
+            ActivityOffer.objects.select_related('host'),
+            pk=pk,
+            is_active=True,
+            starts_at__gte=timezone.now(),
+            host__is_active=True,
+            host__profile_status='active',
+        )
+        if offer.host_id in blocked_user_ids(request.user):
+            raise NotFound('This offer is not available.')
+        return Response(ActivityOfferSerializer(offer, context={'request': request}).data)
+
+    def patch(self, request, pk):
+        offer = get_object_or_404(ActivityOffer, pk=pk, host=request.user, is_active=True)
+        serializer = ActivityOfferSerializer(
+            offer,
+            data=request.data,
+            partial=True,
+            context={'request': request},
+        )
+        serializer.is_valid(raise_exception=True)
+        offer = serializer.save()
+        return Response(ActivityOfferSerializer(offer, context={'request': request}).data)
+
+    def delete(self, request, pk):
+        offer = get_object_or_404(ActivityOffer, pk=pk, host=request.user, is_active=True)
+        offer.is_active = False
+        offer.save(update_fields=('is_active', 'updated_at'))
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class OfferConversationListView(APIView):
+    def get(self, request):
+        blocked_ids = blocked_user_ids(request.user)
+        conversations = OfferConversation.objects.filter(
+            Q(requester=request.user) | Q(host=request.user),
+        ).exclude(
+            Q(requester_id__in=blocked_ids) | Q(host_id__in=blocked_ids),
+        ).select_related('offer', 'requester', 'host').prefetch_related('messages')[:100]
+        return Response(OfferConversationSerializer(
+            conversations,
+            many=True,
+            context={'request': request},
+        ).data)
+
+
+class OfferConversationDetailView(APIView):
+    def get(self, request, pk):
+        conversation = get_object_or_404(
+            OfferConversation.objects.select_related('offer', 'requester', 'host'),
+            pk=pk,
+        )
+        if request.user.id not in (conversation.requester_id, conversation.host_id):
+            raise NotFound('Conversation not found.')
+        other_user_id = (
+            conversation.host_id
+            if request.user.id == conversation.requester_id
+            else conversation.requester_id
+        )
+        if other_user_id in blocked_user_ids(request.user):
+            raise NotFound('Conversation not found.')
+        return Response(OfferConversationSerializer(
+            conversation,
+            context={'request': request},
+        ).data)
+
+
+class OfferMessageView(APIView):
+    throttle_classes = (throttling.ScopedRateThrottle,)
+    throttle_scope = 'offer-message'
+
+    def get_conversation(self, request, pk):
+        conversation = get_object_or_404(
+            OfferConversation.objects.select_related('offer', 'requester', 'host'),
+            pk=pk,
+        )
+        if request.user.id not in (conversation.requester_id, conversation.host_id):
+            raise NotFound('Conversation not found.')
+        other_user_id = (
+            conversation.host_id
+            if request.user.id == conversation.requester_id
+            else conversation.requester_id
+        )
+        if other_user_id in blocked_user_ids(request.user):
+            raise NotFound('Conversation not found.')
+        return conversation
+
+    def get(self, request, pk):
+        conversation = self.get_conversation(request, pk)
+        OfferMessage.objects.filter(
+            conversation=conversation,
+        ).exclude(sender=request.user).filter(read_at__isnull=True).update(read_at=timezone.now())
+        messages = conversation.messages.select_related('sender')
+        return Response(OfferMessageSerializer(messages, many=True).data)
+
+    def post(self, request, pk):
+        conversation = self.get_conversation(request, pk)
+        if not request.user.is_active or request.user.profile_status != 'active':
+            raise PermissionDenied('Your account must be active to send messages.')
+        serializer = OfferMessageSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        message = serializer.save(conversation=conversation, sender=request.user)
+        conversation.save(update_fields=('updated_at',))
+        recipient = conversation.host if request.user.id == conversation.requester_id else conversation.requester
+        from apps.notifications.services import create_notification
+        create_notification(
+            recipient=recipient,
+            actor=request.user,
+            notification_type='message',
+            body=f'{request.user.display_name} sent you a message about {conversation.offer.title if conversation.offer else "an offer"}.',
+            target_type='offer_conversation',
+            target_id=conversation.id,
+        )
+        return Response(OfferMessageSerializer(message).data, status=status.HTTP_201_CREATED)
+
+
+class StartOfferConversationView(APIView):
+    throttle_classes = (throttling.ScopedRateThrottle,)
+    throttle_scope = 'offer-message'
+
+    def post(self, request, offer_id):
+        if not request.user.is_active or request.user.profile_status != 'active':
+            raise PermissionDenied('Your account must be active to send messages.')
+        offer = get_object_or_404(
+            ActivityOffer.objects.select_related('host'),
+            pk=offer_id,
+            is_active=True,
+            starts_at__gte=timezone.now(),
+            host__is_active=True,
+            host__profile_status='active',
+        )
+        if offer.host_id == request.user.id:
+            raise ValidationError({'detail': 'You cannot message yourself about your offer.'})
+        if offer.host_id in blocked_user_ids(request.user):
+            raise NotFound('This offer is not available.')
+        serializer = OfferMessageSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        conversation, _created = OfferConversation.objects.get_or_create(
+            offer=offer,
+            requester=request.user,
+            defaults={'host': offer.host},
+        )
+        message = serializer.save(conversation=conversation, sender=request.user)
+        conversation.save(update_fields=('updated_at',))
+        from apps.notifications.services import create_notification
+        create_notification(
+            recipient=offer.host,
+            actor=request.user,
+            notification_type='message',
+            body=f'{request.user.display_name} messaged you about {offer.title}.',
+            target_type='offer_conversation',
+            target_id=conversation.id,
+        )
+        return Response({
+            'conversation': OfferConversationSerializer(
+                conversation,
+                context={'request': request},
+            ).data,
+            'message': OfferMessageSerializer(message).data,
+        }, status=status.HTTP_201_CREATED)

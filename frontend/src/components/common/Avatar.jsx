@@ -1,6 +1,7 @@
 import { getInitials } from '../../utils/helpers'
+import ImagePreview from './ImagePreview'
 
-export default function Avatar({ src, alt, size = 'md', className = '' }) {
+export default function Avatar({ src, alt, size = 'md', className = '', preview = false }) {
   const sizeClasses = {
     xs: { width: '28px', height: '28px', fontSize: '10px' },
     sm: { width: '36px', height: '36px', fontSize: '12px' },
@@ -13,10 +14,10 @@ export default function Avatar({ src, alt, size = 'md', className = '' }) {
   const s = sizeClasses[size] || sizeClasses.md
 
   if (src) {
-    return (
+    const image = (
       <img
         src={src}
-        alt={alt || 'Avatar'}
+        alt={preview ? '' : alt || 'Avatar'}
         className={className}
         style={{
           width: s.width,
@@ -30,6 +31,9 @@ export default function Avatar({ src, alt, size = 'md', className = '' }) {
         loading="lazy"
       />
     )
+    return preview
+      ? <ImagePreview src={src} alt={`${alt || 'Profile'} picture`} triggerStyle={{ borderRadius: '50%', flexShrink: 0 }}>{image}</ImagePreview>
+      : image
   }
 
   return (

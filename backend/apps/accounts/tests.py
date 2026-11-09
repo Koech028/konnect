@@ -1,9 +1,11 @@
 import re
 from datetime import timedelta
+from unittest.mock import patch
 
 from django.core import mail
 from django.test import override_settings
 from django.utils import timezone
+from smtplib import SMTPException
 from rest_framework.test import APITestCase
 from django.core.cache import cache
 
@@ -71,6 +73,31 @@ class AccountApiTests(APITestCase):
         current = self.client.get('/api/v1/auth/me/')
         self.assertEqual(current.status_code, 200)
         self.assertEqual(current.data['email'], 'new-member@example.com')
+
+    def test_registration_rejects_bios_over_100_words(self):
+        accepted = self.client.post('/api/v1/auth/register/', {
+            'email': 'long-but-valid-bio@example.com',
+            'password': 'Mango!Sunrise_2026',
+            'display_name': 'Valid Bio',
+            'age': 26,
+            'gender': 'woman',
+            'bio': ' '.join(['description'] * 100),
+        }, format='json')
+        self.assertEqual(accepted.status_code, 201, accepted.data)
+        self.assertEqual(len(User.objects.get(email='long-but-valid-bio@example.com').bio.split()), 100)
+
+        response = self.client.post('/api/v1/auth/register/', {
+            'email': 'long-bio@example.com',
+            'password': 'Mango!Sunrise_2026',
+            'display_name': 'Long Bio',
+            'age': 26,
+            'gender': 'woman',
+            'bio': ' '.join(['word'] * 101),
+        }, format='json')
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('100 words or fewer', str(response.data['bio']))
+        self.assertFalse(User.objects.filter(email='long-bio@example.com').exists())
 
     def test_referral_link_attributes_new_signup_and_counts_it_for_referrer(self):
         referrer = User.objects.create_user(
@@ -219,7 +246,14 @@ class AccountApiTests(APITestCase):
         self.assertEqual(existing.status_code, 200)
         self.assertEqual(missing.status_code, 200)
         self.assertEqual(existing.data, missing.data)
+        self.assertEqual(len(mail.outbox), 1)
+        reset_email = mail.outbox[0]
+        self.assertEqual(reset_email.to, ['member@example.com'])
+        self.assertEqual(reset_email.subject, 'Your LinkUp password reset code')
+        self.assertIn('password reset code is', reset_email.body)
         code = self.email_code()
+        self.assertIn(code, reset_email.body)
+        self.assertIn('expires in 10 minutes', reset_email.body)
 
         reset = self.client.post('/api/v1/auth/password-reset/confirm/', {
             'email': user.email,
@@ -229,12 +263,47 @@ class AccountApiTests(APITestCase):
         self.assertEqual(reset.status_code, 200)
         user.refresh_from_db()
         self.assertTrue(user.check_password('New!CedarRiver_2026'))
+        login = self.client.post('/api/v1/auth/login/', {
+            'email': user.email,
+            'password': 'New!CedarRiver_2026',
+        }, format='json')
+        self.assertEqual(login.status_code, 200)
+        self.assertIn('access', login.data)
         reused = self.client.post('/api/v1/auth/password-reset/confirm/', {
             'email': user.email,
             'code': code,
             'password': 'Other!CedarRiver_2026',
         }, format='json')
         self.assertEqual(reused.status_code, 400)
+
+    def test_password_reset_email_failure_does_not_leave_a_live_code(self):
+        user = User.objects.create_user(
+            email='member@example.com',
+            password='Mango!Sunrise_2026',
+            display_name='Member',
+            age=25,
+            gender='woman',
+        )
+        with patch('apps.accounts.otp.send_mail', side_effect=SMTPException('mail server unavailable')):
+            with self.assertRaises(SMTPException):
+                self.client.post(
+                    '/api/v1/auth/password-reset/',
+                    {'email': user.email},
+                    format='json',
+                )
+
+        self.assertFalse(EmailVerificationCode.objects.filter(
+            user=user,
+            purpose=EmailVerificationCode.Purpose.PASSWORD_RESET,
+            consumed_at__isnull=True,
+        ).exists())
+        retried = self.client.post(
+            '/api/v1/auth/password-reset/',
+            {'email': user.email},
+            format='json',
+        )
+        self.assertEqual(retried.status_code, 200)
+        self.assertEqual(len(mail.outbox), 1)
 
     def test_referrals_count_only_verified_signups(self):
         referrer = User.objects.create_user(

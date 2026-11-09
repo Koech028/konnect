@@ -16,6 +16,8 @@ const fieldStyle = {
   font: 'inherit'
 }
 
+const countWords = value => value.trim().split(/\s+/).filter(Boolean).length
+
 export default function EditProfilePage() {
   const { user, updateUser, refreshUser } = useAuth()
   const navigate = useNavigate()
@@ -94,6 +96,10 @@ export default function EditProfilePage() {
     const age = Number(form.age)
     if (!Number.isInteger(age) || age < 18 || age > 100) {
       setError('Enter a valid age (18 or older).')
+      return
+    }
+    if (countWords(form.bio) > 100) {
+      setError('Your bio must be 100 words or fewer.')
       return
     }
 
@@ -190,9 +196,9 @@ export default function EditProfilePage() {
           <h2 style={sectionTitleStyle}>About you</h2>
           <Field label="Display name" value={form.display_name} onChange={value => change('display_name', value)} maxLength={40} required />
           <Field label="Age" value={form.age} onChange={value => change('age', value)} type="number" min="18" max="100" required />
-          <label style={labelStyle} htmlFor="profile-bio">Bio</label>
-          <textarea id="profile-bio" value={form.bio} onChange={event => change('bio', event.target.value)} rows={4} maxLength={500} placeholder="Tell people a little about yourself" style={{ ...fieldStyle, resize: 'vertical' }} />
-          <p style={{ ...helperStyle, textAlign: 'right' }}>{form.bio.length}/500</p>
+          <label style={labelStyle} htmlFor="profile-bio">Bio (optional)</label>
+          <textarea id="profile-bio" value={form.bio} onChange={event => change('bio', event.target.value)} rows={4} placeholder="Write freely about yourself, your interests, or what you'd like others to know." style={{ ...fieldStyle, resize: 'vertical' }} />
+          <p style={{ ...helperStyle, textAlign: 'right', color: countWords(form.bio) > 100 ? 'var(--color-error)' : undefined }}>{countWords(form.bio)}/100 words</p>
           <Field label="Interests (comma separated)" value={form.interests} onChange={value => change('interests', value)} placeholder="Coffee, hiking, live music" />
         </section>
 
