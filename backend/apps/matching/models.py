@@ -19,6 +19,19 @@ class UserLike(models.Model):
         ordering = ('-created_at',)
 
 
+class Follow(models.Model):
+    follower = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='follows_started')
+    following = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='follows_received')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=('follower', 'following'), name='unique_user_follow'),
+            models.CheckConstraint(condition=~Q(follower=F('following')), name='user_cannot_follow_self'),
+        ]
+        ordering = ('-created_at',)
+
+
 class Match(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     user_one = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='matches_as_one')

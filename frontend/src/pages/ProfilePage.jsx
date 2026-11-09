@@ -4,6 +4,7 @@ import { UserPlus } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import ProfileHeader from '../components/profile/ProfileHeader'
 import PhotoGrid from '../components/profile/PhotoGrid'
+import ProfileShorts from '../components/profile/ProfileShorts'
 import FeedPost from '../components/feed/FeedPost'
 import { useAppData } from '../context/AppDataContext'
 
@@ -24,6 +25,7 @@ export default function ProfilePage() {
 
   const tabs = [
     { id: 'posts', label: 'Posts' },
+    { id: 'videos', label: 'Videos' },
     { id: 'photos', label: 'Photos' },
     { id: 'about', label: 'About' }
   ]
@@ -43,6 +45,7 @@ export default function ProfilePage() {
 
       <div style={{
         display: 'flex',
+        overflowX: 'auto',
         borderBottom: '1px solid var(--color-border-light)',
         background: 'var(--color-surface)',
         marginBottom: 'var(--space-md)'
@@ -50,9 +53,12 @@ export default function ProfilePage() {
         {tabs.map(tab => (
           <button
             key={tab.id}
+            type="button"
+            aria-pressed={activeTab === tab.id}
             onClick={() => setActiveTab(tab.id)}
             style={{
-              flex: 1,
+              flex: '1 0 25%',
+              minWidth: 74,
               padding: '14px',
               border: 'none',
               background: 'none',
@@ -83,6 +89,10 @@ export default function ProfilePage() {
 
         {activeTab === 'photos' && (
           <PhotoGrid photos={user?.photos || []} />
+        )}
+
+        {activeTab === 'videos' && (
+          <ProfileShorts userId={user?.id} />
         )}
 
         {activeTab === 'about' && (

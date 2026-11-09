@@ -146,7 +146,7 @@ export default function FeedPost({ post, onLike, onShare, onInterest, onPollVote
         gap: '12px',
         padding: 'var(--space-md) var(--space-md) 0'
       }}>
-        <Avatar src={post.author.avatar} alt={post.author.display_name} size="md" />
+        <Avatar src={post.author.avatar} alt={post.author.display_name} size="md" preview />
         <div style={{ flex: 1 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <span style={{

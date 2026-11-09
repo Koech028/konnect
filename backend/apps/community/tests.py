@@ -18,6 +18,7 @@ from apps.community.models import (
     ShortView,
     Story,
 )
+from apps.matching.models import Follow
 
 
 class CommunityApiTests(APITestCase):
@@ -124,6 +125,35 @@ class CommunityApiTests(APITestCase):
         self.assertEqual(listed[0]['comments_count'], 1)
         self.assertEqual(listed[0]['views_count'], 1)
         self.assertTrue(listed[0]['liked_by_me'])
+        self.assertFalse(listed[0]['following_by_me'])
+
+        Short.objects.create(
+            author=self.host,
+            video_url='https://media.example.com/host-short.mp4',
+            duration_seconds=15,
+        )
+        follow = self.client.post(f"/api/v1/follows/{self.host.id}/", {}, format='json')
+        self.assertEqual(follow.status_code, 200)
+        self.assertTrue(follow.data['following'])
+        self.assertEqual(Follow.objects.filter(follower=self.viewer, following=self.host).count(), 1)
+        host_short = next(
+            short for short in self.client.get('/api/v1/shorts/').data
+            if short['author_id'] == str(self.host.id)
+        )
+        self.assertTrue(host_short['following_by_me'])
+
+        unfollow = self.client.delete(f"/api/v1/follows/{self.host.id}/")
+        self.assertEqual(unfollow.status_code, 200)
+        self.assertFalse(unfollow.data['following'])
+        self.assertFalse(Follow.objects.filter(follower=self.viewer, following=self.host).exists())
+
+    def test_users_cannot_follow_themselves_or_blocked_profiles(self):
+        self_follow = self.client.post(f'/api/v1/follows/{self.viewer.id}/', {}, format='json')
+        self.assertEqual(self_follow.status_code, 400)
+
+        self.host.blocks_created.create(blocked=self.viewer)
+        blocked_follow = self.client.post(f'/api/v1/follows/{self.host.id}/', {}, format='json')
+        self.assertEqual(blocked_follow.status_code, 403)
 
     def test_short_is_hidden_from_blocked_users(self):
         short = Short.objects.create(

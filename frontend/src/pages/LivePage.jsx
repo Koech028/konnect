@@ -112,19 +112,16 @@ export default function LivePage() {
       {!loading && !streams.length && <p style={helperStyle}>No one is live right now. Start a stream and be the first.</p>}
       <div style={{ display: 'grid', gap: 12 }}>
         {streams.map(stream => (
-          <button
-            key={stream.id}
-            type="button"
-            onClick={() => navigate(`/live/${stream.id}`)}
-            style={streamCardStyle}
-          >
-            <Avatar src={stream.host_avatar_url} alt={stream.host_name} size="md" />
-            <span style={{ minWidth: 0, flex: 1, textAlign: 'left' }}>
-              <strong style={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{stream.title}</strong>
-              <span style={{ color: 'var(--color-text-secondary)', fontSize: 13 }}>{stream.host_name} · {stream.entry_price ? `${stream.entry_price} credits to join` : 'Free to join'}</span>
-            </span>
-            <span style={liveBadgeStyle}><span style={dotStyle} /> LIVE</span>
-          </button>
+          <div key={stream.id} style={streamCardStyle}>
+            <Avatar src={stream.host_avatar_url} alt={stream.host_name} size="md" preview />
+            <button type="button" onClick={() => navigate(`/live/${stream.id}`)} style={streamOpenButtonStyle}>
+              <span style={{ minWidth: 0, flex: 1, textAlign: 'left' }}>
+                <strong style={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{stream.title}</strong>
+                <span style={{ color: 'var(--color-text-secondary)', fontSize: 13 }}>{stream.host_name} · {stream.entry_price ? `${stream.entry_price} credits to join` : 'Free to join'}</span>
+              </span>
+              <span style={liveBadgeStyle}><span style={dotStyle} /> LIVE</span>
+            </button>
+          </div>
         ))}
       </div>
     </div>
@@ -137,7 +134,8 @@ const inputStyle = { width: '100%', padding: '12px 14px', border: '1px solid var
 const entryLabelStyle = { display: 'block', margin: '14px 0 6px', fontSize: 13, fontWeight: 600, color: 'var(--color-text-secondary)' }
 const buttonStyle = { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, width: '100%', marginTop: 12, padding: 12, border: 0, borderRadius: 'var(--radius-md)', background: 'var(--color-primary)', color: '#fff', font: 'inherit', fontWeight: 700, cursor: 'pointer' }
 const walletStyle = { display: 'flex', alignItems: 'center', gap: 9, padding: '12px 14px', borderRadius: 'var(--radius-md)', background: 'var(--color-surface)', boxShadow: 'var(--shadow-sm)' }
-const streamCardStyle = { display: 'flex', alignItems: 'center', gap: 12, width: '100%', padding: 14, border: '1px solid var(--color-border-light)', borderRadius: 'var(--radius-lg)', background: 'var(--color-surface)', color: 'var(--color-text-primary)', font: 'inherit', cursor: 'pointer' }
+const streamCardStyle = { display: 'flex', alignItems: 'center', gap: 12, width: '100%', padding: 14, border: '1px solid var(--color-border-light)', borderRadius: 'var(--radius-lg)', background: 'var(--color-surface)', color: 'var(--color-text-primary)' }
+const streamOpenButtonStyle = { display: 'flex', alignItems: 'center', gap: 12, flex: 1, minWidth: 0, padding: 0, border: 0, background: 'transparent', color: 'inherit', font: 'inherit', textAlign: 'left', cursor: 'pointer' }
 const liveBadgeStyle = { display: 'flex', alignItems: 'center', gap: 5, padding: '4px 8px', borderRadius: 'var(--radius-full)', background: 'var(--color-primary-soft)', color: 'var(--color-primary-dark)', fontSize: 11, fontWeight: 800 }
 const dotStyle = { width: 7, height: 7, borderRadius: '50%', background: 'var(--color-primary)' }
 const errorStyle = { marginTop: 10, color: 'var(--color-error)', fontSize: 13 }

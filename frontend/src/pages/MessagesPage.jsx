@@ -6,18 +6,33 @@ import MatchList from '../components/messages/MatchList'
 export default function MessagesPage() {
   const [matches, setMatches] = useState([])
   const [offerConversations, setOfferConversations] = useState([])
-  const [error, setError] = useState('')
+  const [matchesError, setMatchesError] = useState('')
+  const [offersError, setOffersError] = useState('')
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    Promise.all([
+    let active = true
+    Promise.allSettled([
       api.get('/api/v1/matches/'),
       api.get('/api/v1/offers/conversations/')
-    ])
-      .then(([matchResponse, offerResponse]) => {
-        setMatches(matchResponse.results || matchResponse)
-        setOfferConversations(offerResponse)
-      })
-      .catch(err => setError(err.message || 'Conversations could not be loaded.'))
+    ]).then(([matchResult, offerResult]) => {
+      if (!active) return
+      if (matchResult.status === 'fulfilled') {
+        setMatches(matchResult.value.results || matchResult.value)
+      } else {
+        setMatchesError(matchResult.reason.message || 'Match conversations could not be loaded.')
+      }
+      if (offerResult.status === 'fulfilled') {
+        setOfferConversations(offerResult.value)
+      } else {
+        setOffersError(offerResult.reason.message || 'Offer conversations could not be loaded.')
+      }
+    }).finally(() => {
+      if (active) setLoading(false)
+    })
+    return () => {
+      active = false
+    }
   }, [])
 
   return (
@@ -42,12 +57,20 @@ export default function MessagesPage() {
           {matches.length + offerConversations.length} {matches.length + offerConversations.length === 1 ? 'conversation' : 'conversations'}
         </p>
       </div>
-      {error && <p role="alert" style={{ padding: 'var(--space-md)', color: 'var(--color-error)' }}>{error}</p>}
-      {!error && matches.length === 0 && offerConversations.length === 0 && (
+      {loading && <p role="status" style={{ padding: 'var(--space-md)', color: 'var(--color-text-secondary)' }}>Loading conversations…</p>}
+      {matchesError && <p role="alert" style={{ padding: 'var(--space-md)', color: 'var(--color-error)' }}>{matchesError}</p>}
+      {offersError && <p role="alert" style={{ padding: 'var(--space-md)', color: 'var(--color-error)' }}>{offersError}</p>}
+      {!loading && matches.length === 0 && offerConversations.length === 0 && !matchesError && !offersError && (
         <div style={{ padding: 'var(--space-md)', color: 'var(--color-text-secondary)' }}>
           <p style={{ margin: '0 0 12px' }}>Your match and offer conversations will appear here.</p>
           <Link to="/discover" style={{ color: 'var(--color-primary)', fontWeight: 600, textDecoration: 'none' }}>Start matching</Link>
         </div>
+      )}
+      {!loading && matches.length === 0 && !matchesError && offerConversations.length > 0 && (
+        <p style={{ padding: '0 var(--space-md)', color: 'var(--color-text-secondary)', fontSize: 13 }}>Your match conversations will appear here.</p>
+      )}
+      {!loading && offerConversations.length === 0 && !offersError && matches.length > 0 && (
+        <p style={{ padding: 'var(--space-md) var(--space-md) 0', color: 'var(--color-text-secondary)', fontSize: 13 }}>Your offer conversations will appear here.</p>
       )}
       {offerConversations.length > 0 && (
         <section style={{ padding: 'var(--space-md)' }}>

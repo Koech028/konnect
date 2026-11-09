@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Heart, MessageCircle, Plus, Send, Trash2, X } from 'lucide-react'
+import { Check, Heart, MessageCircle, Plus, Send, X } from 'lucide-react'
+import { Link } from 'react-router-dom'
 import Avatar from '../components/common/Avatar'
 import ReportContentButton from '../components/feed/ReportContentButton'
 import { useAuth } from '../context/AuthContext'
@@ -16,6 +17,7 @@ export default function ShortsPage() {
   const [showComposer, setShowComposer] = useState(false)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [followingIds, setFollowingIds] = useState(new Set())
   const [error, setError] = useState('')
   const watched = useRef(new Set())
   const feedRef = useRef(null)
@@ -68,14 +70,25 @@ export default function ShortsPage() {
     }
   }
 
-  const deleteShort = async short => {
-    if (!window.confirm('Delete this Short? This cannot be undone.')) return
+  const toggleFollow = async short => {
+    if (followingIds.has(short.author_id)) return
+    setFollowingIds(current => new Set(current).add(short.author_id))
     setError('')
     try {
-      await api.delete(`/api/v1/shorts/${short.id}/`)
-      setShorts(current => current.filter(item => item.id !== short.id))
+      const result = short.following_by_me
+        ? await api.delete(`/api/v1/follows/${short.author_id}/`)
+        : await api.post(`/api/v1/follows/${short.author_id}/`, {})
+      setShorts(current => current.map(item => item.author_id === short.author_id
+        ? { ...item, following_by_me: result.following }
+        : item))
     } catch (err) {
-      setError(err.message || 'The Short could not be deleted.')
+      setError(err.message || 'The follow could not be updated.')
+    } finally {
+      setFollowingIds(current => {
+        const next = new Set(current)
+        next.delete(short.author_id)
+        return next
+      })
     }
   }
 
@@ -161,46 +174,54 @@ export default function ShortsPage() {
 
       <div ref={feedRef} style={feedStyle}>
         {shorts.map(short => (
-          <article key={short.id} data-short-card style={shortCardStyle}>
-            <video
-              src={short.video_url}
-              controls
-              muted
-              loop
-              playsInline
-              preload="metadata"
-              onPlay={() => recordWatch(short.id)}
-              style={videoStyle}
-            />
-            <div style={detailsStyle}>
-              <div style={authorStyle}>
-                <Avatar src={short.author_avatar} alt={short.author_name} size="sm" />
-                <strong>{short.author_name}</strong>
-                <span style={counterStyle}>{short.views_count} views</span>
-              </div>
-              {short.caption && <p style={captionStyle}>{short.caption}</p>}
-              <div style={actionRowStyle}>
-                <button type="button" aria-label={short.liked_by_me ? 'Unlike Short' : 'Like Short'} onClick={() => toggleLike(short)} style={actionButtonStyle}>
-                  <Heart size={19} fill={short.liked_by_me ? 'currentColor' : 'none'} color={short.liked_by_me ? 'var(--color-primary)' : 'currentColor'} />
-                  {short.likes_count}
-                </button>
-                <button type="button" onClick={() => toggleComments(short.id)} style={actionButtonStyle}>
-                  <MessageCircle size={19} /> {short.comments_count}
-                </button>
-                {short.author_id === user?.id && (
-                  <button type="button" aria-label="Delete your Short" onClick={() => deleteShort(short)} style={actionButtonStyle}>
-                    <Trash2 size={18} /> Delete
+          <article key={short.id} data-short-card className={`shorts-card${activeComments === short.id ? ' shorts-card-comments-open' : ''}`} style={shortCardStyle}>
+            <div className="shorts-media-layout">
+              <div className="shorts-video-frame">
+                <video
+                  src={short.video_url}
+                  controls
+                  muted
+                  loop
+                  playsInline
+                  preload="metadata"
+                  onPlay={() => recordWatch(short.id)}
+                  style={videoStyle}
+                />
+                <div className="shorts-action-rail" aria-label="Short actions">
+                  <div className="shorts-creator-control">
+                    <Link to={`/users/${short.author_id}`} aria-label={`View ${short.author_name}'s profile`} className="shorts-creator-avatar">
+                      <Avatar src={short.author_avatar} alt={short.author_name} size="md" />
+                    </Link>
+                    {short.author_id !== user?.id && (
+                      <button
+                        type="button"
+                        aria-label={short.following_by_me ? `Unfollow ${short.author_name}` : `Follow ${short.author_name}`}
+                        aria-pressed={short.following_by_me}
+                        disabled={followingIds.has(short.author_id)}
+                        onClick={() => toggleFollow(short)}
+                        className="shorts-follow-button"
+                      >
+                        {short.following_by_me ? <Check size={14} /> : <Plus size={14} />}
+                      </button>
+                    )}
+                  </div>
+                  <button type="button" aria-label={short.liked_by_me ? 'Unlike Short' : 'Like Short'} aria-pressed={short.liked_by_me} onClick={() => toggleLike(short)} className="shorts-overlay-action">
+                    <Heart size={21} fill={short.liked_by_me ? 'currentColor' : 'none'} />
+                    <span>{short.likes_count}</span>
                   </button>
-                )}
-                {short.author_id !== user?.id && <ReportContentButton shortId={short.id} />}
+                  <button type="button" aria-label="View comments" aria-expanded={activeComments === short.id} onClick={() => toggleComments(short.id)} className="shorts-overlay-action">
+                    <MessageCircle size={21} />
+                    <span>{short.comments_count}</span>
+                  </button>
+                </div>
               </div>
               {activeComments === short.id && (
-                <section aria-label="Short comments" style={commentsPanelStyle}>
+                <section aria-label="Short comments" className="shorts-comments-panel">
                   <div style={commentsHeaderStyle}>
                     <strong>Comments</strong>
                     <button type="button" aria-label="Close comments" onClick={() => setActiveComments('')} style={closeButtonStyle}><X size={17} /></button>
                   </div>
-                  <div style={commentListStyle}>
+                  <div className="shorts-comment-list">
                     {comments.map(comment => (
                       <div key={comment.id} style={commentRowStyle}>
                         <p style={commentStyle}><strong>{comment.author_name}</strong> {comment.text}</p>
@@ -215,6 +236,18 @@ export default function ShortsPage() {
                   </form>
                 </section>
               )}
+            </div>
+            <div className="shorts-video-caption">
+              <Link to={`/users/${short.author_id}`} className="shorts-caption-author">{short.author_name}</Link>
+              {short.caption && <p>{short.caption.split(/(#[\w]+)/g).map((part, index) => (
+                part.startsWith('#')
+                  ? <span className="shorts-hashtag" key={`${part}-${index}`}>{part}</span>
+                  : part
+              ))}</p>}
+            </div>
+            <div style={detailsStyle}>
+              <span style={counterStyle}>{short.views_count} views</span>
+              {short.author_id !== user?.id && <ReportContentButton shortId={short.id} />}
             </div>
           </article>
         ))}
@@ -235,18 +268,12 @@ const submitStyle = { padding: 10, border: 0, borderRadius: 'var(--radius-md)', 
 const errorStyle = { padding: 10, color: 'var(--color-error)', fontSize: 13 }
 const emptyStyle = { padding: 24, textAlign: 'center', color: 'var(--color-text-secondary)' }
 const feedStyle = { display: 'grid', justifyItems: 'center', gap: 'var(--space-md)' }
-const shortCardStyle = { position: 'relative', width: 'min(100%, 480px)', overflow: 'hidden', borderRadius: 'var(--radius-lg)', background: '#111', color: '#fff', boxShadow: 'var(--shadow-md)' }
-const videoStyle = { display: 'block', width: '100%', maxHeight: 'min(75vh, 720px)', minHeight: 220, objectFit: 'contain', background: '#090909' }
+const shortCardStyle = { position: 'relative', width: 'min(100%, 405px)', overflow: 'hidden', borderRadius: 'var(--radius-lg)', background: 'var(--color-surface)', boxShadow: 'var(--shadow-md)' }
+const videoStyle = { display: 'block', width: '100%', height: '100%', objectFit: 'contain', background: '#090909' }
 const detailsStyle = { padding: '12px 14px', background: 'var(--color-surface)', color: 'var(--color-text-primary)' }
-const authorStyle = { display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }
 const counterStyle = { color: 'var(--color-text-secondary)', fontSize: 12 }
-const captionStyle = { margin: '9px 0', fontSize: 14, whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }
-const actionRowStyle = { display: 'flex', gap: 18 }
-const actionButtonStyle = { display: 'flex', alignItems: 'center', gap: 6, padding: 5, border: 0, background: 'none', color: 'var(--color-text-primary)', font: 'inherit', fontSize: 13, cursor: 'pointer' }
-const commentsPanelStyle = { paddingTop: 10, borderTop: '1px solid var(--color-border-light)' }
 const commentsHeaderStyle = { display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 14 }
 const closeButtonStyle = { display: 'grid', placeItems: 'center', width: 30, height: 30, border: 0, borderRadius: '50%', background: 'transparent', color: 'var(--color-text-primary)', cursor: 'pointer' }
-const commentListStyle = { display: 'grid', gap: 6, maxHeight: 180, overflowY: 'auto', padding: '8px 0' }
 const commentStyle = { margin: 0, fontSize: 13, overflowWrap: 'anywhere' }
 const commentRowStyle = { display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }
 const commentFormStyle = { display: 'flex', alignItems: 'center', gap: 8 }

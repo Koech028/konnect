@@ -61,7 +61,7 @@ export default function PostDetailPage() {
           {postComments.length === 0 && <p style={{ color: 'var(--color-text-secondary)', fontSize: '14px', marginBottom: '16px' }}>Be the first to start the conversation.</p>}
           {postComments.map(comment => (
             <div key={comment.id} style={{ display: 'flex', gap: '10px', padding: '12px 0', borderBottom: '1px solid var(--color-border-light)' }}>
-              <Avatar src={comment.author?.avatar} alt={comment.author?.display_name} size="sm" />
+              <Avatar src={comment.author?.avatar} alt={comment.author?.display_name} size="sm" preview />
               <div style={{ minWidth: 0, flex: 1 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px' }}>
                   <strong style={{ fontSize: '14px' }}>{comment.author?.display_name || 'Member'}</strong>

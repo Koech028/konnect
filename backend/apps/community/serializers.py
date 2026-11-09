@@ -67,17 +67,18 @@ class ShortSerializer(serializers.ModelSerializer):
     comments_count = serializers.IntegerField(read_only=True)
     views_count = serializers.IntegerField(read_only=True)
     liked_by_me = serializers.SerializerMethodField()
+    following_by_me = serializers.BooleanField(read_only=True)
 
     class Meta:
         model = Short
         fields = (
             'id', 'author_id', 'author_name', 'author_avatar', 'caption',
             'video_url', 'duration_seconds', 'likes_count', 'comments_count',
-            'views_count', 'liked_by_me', 'created_at',
+            'views_count', 'liked_by_me', 'following_by_me', 'created_at',
         )
         read_only_fields = (
             'id', 'author_id', 'author_name', 'author_avatar', 'likes_count',
-            'comments_count', 'views_count', 'liked_by_me', 'created_at',
+            'comments_count', 'views_count', 'liked_by_me', 'following_by_me', 'created_at',
         )
 
     def get_liked_by_me(self, obj):

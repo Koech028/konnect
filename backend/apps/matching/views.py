@@ -7,7 +7,7 @@ from rest_framework.views import APIView
 
 from apps.accounts.models import User
 from apps.accounts.serializers import UserSerializer
-from apps.matching.models import Match, UserLike
+from apps.matching.models import Follow, Match, UserLike
 from apps.matching.serializers import MatchSerializer
 from apps.safety.models import Block
 
@@ -74,6 +74,28 @@ class LikeView(APIView):
             raise ValidationError({'user_id': 'This field is required.'})
         UserLike.objects.filter(sender=request.user, recipient_id=user_id).delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class FollowView(APIView):
+    def post(self, request, user_id):
+        following = get_object_or_404(
+            User,
+            pk=user_id,
+            is_active=True,
+            profile_status=User.ProfileStatus.ACTIVE,
+        )
+        if following.pk == request.user.pk:
+            raise ValidationError({'user_id': 'You cannot follow your own profile.'})
+        if Block.objects.filter(
+            Q(blocker=request.user, blocked=following) | Q(blocker=following, blocked=request.user)
+        ).exists():
+            return Response({'detail': 'You cannot follow this profile.'}, status=status.HTTP_403_FORBIDDEN)
+        Follow.objects.get_or_create(follower=request.user, following=following)
+        return Response({'following': True}, status=status.HTTP_200_OK)
+
+    def delete(self, request, user_id):
+        Follow.objects.filter(follower=request.user, following_id=user_id).delete()
+        return Response({'following': False}, status=status.HTTP_200_OK)
 
 
 class IncomingLikesView(APIView):

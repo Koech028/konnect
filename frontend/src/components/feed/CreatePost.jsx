@@ -58,7 +58,7 @@ export default function CreatePost({ onSubmit }) {
     }}>
       <form onSubmit={handleSubmit}>
         <div style={{ display: 'flex', gap: '12px' }}>
-          <Avatar src={user?.avatar} alt={user?.display_name} size="md" />
+          <Avatar src={user?.avatar} alt={user?.display_name} size="md" preview />
           <div style={{ flex: 1 }}>
             <textarea
               value={text}

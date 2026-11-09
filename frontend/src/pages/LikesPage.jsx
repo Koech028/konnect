@@ -57,8 +57,8 @@ export default function LikesPage() {
             const liked = likedUserIds.includes(person.id)
             return (
               <div key={person.id} style={personCardStyle}>
-                <Link to={`/users/${person.id}`} style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0, color: 'inherit', textDecoration: 'none' }}>
-                  <Avatar src={person.avatar} alt={person.display_name} size="md" />
+                <Avatar src={person.avatar} alt={person.display_name} size="md" preview />
+                <Link to={`/users/${person.id}`} style={{ display: 'block', flex: 1, minWidth: 0, color: 'inherit', textDecoration: 'none' }}>
                   <div style={{ minWidth: 0 }}>
                     <strong style={{ display: 'block' }}>{person.display_name}, {person.age}</strong>
                     <span style={{ fontSize: '13px', color: 'var(--color-text-secondary)' }}>{person.location?.city}</span>
