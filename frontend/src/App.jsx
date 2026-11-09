@@ -2,6 +2,7 @@ import { lazy, Suspense } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { useAuth } from './context/AuthContext'
 import LandingPage from './pages/LandingPage'
+import LegalPage from './pages/LegalPage'
 import AppLayout from './components/layout/AppLayout'
 import FeedPage from './pages/FeedPage'
 import DiscoverPage from './pages/DiscoverPage'
@@ -51,6 +52,8 @@ export default function App() {
   return (
     <Routes>
       <Route path="/" element={<HomeRoute />} />
+      <Route path="/privacy-policy" element={<LegalPage type="privacy" />} />
+      <Route path="/terms-and-conditions" element={<LegalPage type="terms" />} />
       <Route path="/login" element={
         <PublicRoute>
           <LoginPage />

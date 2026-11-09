@@ -19,9 +19,9 @@ services:
       - key: DATABASE_URL
         sync: false
       - key: FRONTEND_ORIGIN
-        sync: false
+        value: https://linkup.malakigroup.com
       - key: CSRF_TRUSTED_ORIGINS
-        sync: false
+        value: https://linkup.malakigroup.com
       - key: DJANGO_EMAIL_HOST
         sync: false
       - key: DJANGO_EMAIL_PORT

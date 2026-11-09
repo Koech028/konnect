@@ -1,6 +1,26 @@
-import { ArrowRight, Compass, Heart, MapPin, MessageCircle, ShieldCheck, Sparkles } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import { ArrowRight, ChevronLeft, ChevronRight, Compass, Heart, MapPin, MessageCircle, Pause, Play, ShieldCheck, Sparkles } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import './LandingPage.css'
+
+const profiles = [
+  {
+    image: '/images/sample-profile-1.webp',
+    interests: ['Live music', 'Weekend walks', 'Good coffee']
+  },
+  {
+    image: '/images/sample-profile-2.webp',
+    interests: ['Afrobeat', 'Art markets', 'Street food']
+  },
+  {
+    image: '/images/sample-profile-3.webp',
+    interests: ['Bookshops', 'Brunch', 'Photography']
+  },
+  {
+    image: '/images/sample-profile-4.webp',
+    interests: ['Hiking', 'Football', 'Live shows']
+  }
+]
 
 const features = [
   {
@@ -24,42 +44,176 @@ const features = [
 ]
 
 function ProfilePreview() {
+  const [activeProfileIndex, setActiveProfileIndex] = useState(() => Math.floor(Math.random() * profiles.length))
+  const [isPaused, setIsPaused] = useState(() => window.matchMedia('(prefers-reduced-motion: reduce)').matches)
+  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 })
+  const [exitDirection, setExitDirection] = useState(null)
+  const pointerStart = useRef(null)
+  const transitionTimeout = useRef(null)
+  const autoDirection = useRef(0)
+
+  const dismissProfile = (direction, step = direction === 'right' ? -1 : 1) => {
+    if (transitionTimeout.current !== null || pointerStart.current) return
+
+    setDragOffset({ x: 0, y: 0 })
+    setExitDirection(direction)
+    transitionTimeout.current = window.setTimeout(() => {
+      setActiveProfileIndex(currentIndex => (currentIndex + step + profiles.length) % profiles.length)
+      setDragOffset({ x: 0, y: 0 })
+      setExitDirection(null)
+      transitionTimeout.current = null
+    }, 360)
+  }
+
+  useEffect(() => {
+    if (isPaused) return undefined
+
+    const intervalId = window.setInterval(() => {
+      const directions = ['left', 'right', 'up']
+      const direction = directions[autoDirection.current % directions.length]
+      autoDirection.current += 1
+      dismissProfile(direction, 1)
+    }, 5500)
+
+    return () => window.clearInterval(intervalId)
+  }, [isPaused])
+
+  useEffect(() => () => {
+    if (transitionTimeout.current !== null) window.clearTimeout(transitionTimeout.current)
+  }, [])
+
+  const handlePointerDown = event => {
+    if (event.button !== 0 || event.target.closest('button') || exitDirection) return
+    pointerStart.current = { x: event.clientX, y: event.clientY }
+    event.currentTarget.setPointerCapture(event.pointerId)
+  }
+
+  const handlePointerMove = event => {
+    if (!pointerStart.current) return
+    setDragOffset({
+      x: event.clientX - pointerStart.current.x,
+      y: event.clientY - pointerStart.current.y
+    })
+  }
+
+  const handlePointerUp = event => {
+    if (!pointerStart.current) return
+    const deltaX = event.clientX - pointerStart.current.x
+    const deltaY = event.clientY - pointerStart.current.y
+    pointerStart.current = null
+
+    if (deltaX < -85) dismissProfile('left')
+    else if (deltaX > 85) dismissProfile('right')
+    else if (deltaY < -75) dismissProfile('up', 1)
+    else setDragOffset({ x: 0, y: 0 })
+  }
+
+  const handlePointerCancel = () => {
+    pointerStart.current = null
+    setDragOffset({ x: 0, y: 0 })
+  }
+
   return (
-    <div className="landing-preview" aria-label="A preview of LinkUp profiles and shared interests">
+    <div
+      className="landing-preview"
+      role="group"
+      aria-label="Example LinkUp profiles. Swipe a card left, right, or up to explore."
+    >
       <div className="landing-preview-orbit landing-preview-orbit-one" />
       <div className="landing-preview-orbit landing-preview-orbit-two" />
-      <div className="landing-profile-card">
-        <div className="landing-profile-art">
-          <div className="landing-profile-sun" />
-          <div className="landing-profile-person">
-            <div className="landing-profile-hair" />
-            <div className="landing-profile-face">
-              <span className="landing-profile-eye landing-profile-eye-left" />
-              <span className="landing-profile-eye landing-profile-eye-right" />
-              <span className="landing-profile-smile" />
-            </div>
-            <div className="landing-profile-body" />
-          </div>
-          <span className="landing-photo-label"><MapPin size={13} /> Nairobi</span>
-        </div>
-        <div className="landing-profile-details">
-          <div className="landing-profile-heading">
-            <div>
-              <h2>A little more you</h2>
-              <p>Good conversations start here</p>
-            </div>
-            <span className="landing-online-dot" aria-label="Active" />
-          </div>
-          <div className="landing-interest-list">
-            <span>Live music</span>
-            <span>Weekend walks</span>
-            <span>Good coffee</span>
-          </div>
-          <div className="landing-profile-actions" aria-hidden="true">
-            <span><Heart size={20} /></span>
-            <span className="landing-action-primary"><MessageCircle size={19} /></span>
-          </div>
-        </div>
+      <div className="landing-profile-stack">
+        {profiles.map((stackProfile, stackIndex) => {
+          const isTopCard = stackIndex === 0
+          const profileIndex = (activeProfileIndex + stackIndex) % profiles.length
+          const currentProfile = profiles[profileIndex]
+          const cardClasses = [
+            'landing-profile-card',
+            isTopCard && 'is-top-card',
+            isTopCard && (dragOffset.x !== 0 || dragOffset.y !== 0) && 'is-dragging',
+            isTopCard && exitDirection && `is-exiting is-exiting-${exitDirection}`
+          ].filter(Boolean).join(' ')
+
+          return (
+            <article
+              key={currentProfile.image}
+              className={cardClasses}
+              aria-hidden={!isTopCard}
+              style={{
+                '--stack-index': stackIndex,
+                '--gesture-x': isTopCard ? `${dragOffset.x}px` : '0px',
+                '--gesture-y': isTopCard ? `${dragOffset.y}px` : '0px',
+                '--gesture-rotation': isTopCard ? `${dragOffset.x * 0.07}deg` : '0deg',
+                zIndex: profiles.length - stackIndex
+              }}
+              onPointerDown={isTopCard ? handlePointerDown : undefined}
+              onPointerMove={isTopCard ? handlePointerMove : undefined}
+              onPointerUp={isTopCard ? handlePointerUp : undefined}
+              onPointerCancel={isTopCard ? handlePointerCancel : undefined}
+            >
+              <div className="landing-profile-art">
+                <img
+                  className="landing-profile-photo"
+                  src={currentProfile.image}
+                  alt={isTopCard ? 'Example profile portrait (stock photo)' : ''}
+                  width="800"
+                  height="680"
+                  draggable="false"
+                />
+                <span className="landing-photo-label"><MapPin size={13} /> Nairobi</span>
+                {isTopCard && (
+                  <>
+                    <button className="landing-profile-nav landing-profile-nav-previous" type="button" onClick={() => dismissProfile('right', -1)} aria-label="Show previous example profile">
+                      <ChevronLeft size={19} />
+                    </button>
+                    <button className="landing-profile-nav landing-profile-nav-next" type="button" onClick={() => dismissProfile('left', 1)} aria-label="Show next example profile">
+                      <ChevronRight size={19} />
+                    </button>
+                  </>
+                )}
+              </div>
+              <div className="landing-profile-details">
+                <div className="landing-profile-heading">
+                  <div>
+                    <h2>A little more you</h2>
+                    <p>Example profile · Good conversations start here</p>
+                  </div>
+                  {isTopCard && (
+                    <button
+                      className="landing-carousel-toggle"
+                      type="button"
+                      onClick={() => setIsPaused(paused => !paused)}
+                      aria-label={isPaused ? 'Play profile carousel' : 'Pause profile carousel'}
+                      aria-pressed={isPaused}
+                    >
+                      {isPaused ? <Play size={13} /> : <Pause size={13} />}
+                    </button>
+                  )}
+                </div>
+                <div className="landing-interest-list">
+                  {currentProfile.interests.map(interest => <span key={interest}>{interest}</span>)}
+                </div>
+                <div className="landing-profile-actions" aria-hidden="true">
+                  <span><Heart size={20} /></span>
+                  <span className="landing-action-primary"><MessageCircle size={19} /></span>
+                </div>
+                {isTopCard && (
+                  <div className="landing-profile-pagination" role="group" aria-label={`Example profile ${activeProfileIndex + 1} of ${profiles.length}`}>
+                    {profiles.map((item, index) => (
+                      <button
+                        key={item.image}
+                        type="button"
+                        aria-label={`Show example profile ${index + 1}`}
+                        aria-current={index === activeProfileIndex ? 'true' : undefined}
+                        onPointerDown={event => event.stopPropagation()}
+                        onClick={() => setActiveProfileIndex(index)}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
+            </article>
+          )
+        })}
       </div>
       <div className="landing-note-card">
         <span className="landing-note-icon"><Sparkles size={16} /></span>
@@ -132,12 +286,35 @@ export default function LandingPage() {
       </section>
 
       <footer className="landing-footer">
-        <Link className="landing-brand" to="/" aria-label="LinkUp home">
-          <span className="landing-brand-mark"><Heart size={16} fill="currentColor" /></span>
-          <span>LinkUp</span>
-        </Link>
-        <p>Meet people. Find your kind of connection.</p>
-        <span className="landing-footer-location"><MapPin size={14} /> Nairobi, Kenya</span>
+        <div className="landing-footer-main">
+          <div className="landing-footer-brand">
+            <Link className="landing-brand" to="/" aria-label="LinkUp home">
+              <span className="landing-brand-mark"><Heart size={16} fill="currentColor" /></span>
+              <span>LinkUp</span>
+            </Link>
+            <p>Meet people. Find your kind of connection.</p>
+            <span className="landing-footer-location"><MapPin size={14} /> Nairobi, Kenya</span>
+          </div>
+          <nav className="landing-footer-column" aria-label="Explore LinkUp">
+            <h2>Explore</h2>
+            <Link to="/signup">Create a profile</Link>
+            <Link to="/login">Log in</Link>
+            <a href="#how-it-works">How it works</a>
+          </nav>
+          <nav className="landing-footer-column" aria-label="Legal information">
+            <h2>Legal</h2>
+            <Link to="/privacy-policy">Privacy Policy</Link>
+            <Link to="/terms-and-conditions">Terms &amp; Conditions</Link>
+          </nav>
+          <div className="landing-footer-column landing-footer-social">
+            <h2>Follow LinkUp</h2>
+            <p>Social profiles coming soon.</p>
+          </div>
+        </div>
+        <div className="landing-footer-bottom">
+          <span>© {new Date().getFullYear()} LinkUp. All rights reserved.</span>
+          <span>Developed by <a href="https://savanna-designs.com" target="_blank" rel="noopener noreferrer">Savanna Designs</a></span>
+        </div>
       </footer>
     </main>
   )

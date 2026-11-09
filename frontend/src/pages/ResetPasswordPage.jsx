@@ -29,10 +29,10 @@ export default function ResetPasswordPage() {
     <>
       <PageHeader title="Reset password" backTo="/login" />
       <div style={{ padding: 'var(--space-md)' }}>
-        <form onSubmit={submit} style={cardStyle}>
+        <form onSubmit={submit} className="auth-card" style={cardStyle}>
           <h2 style={{ fontSize: 19, marginBottom: 12 }}>Choose a new password</h2>
           <label htmlFor="reset-email" style={labelStyle}>Email address</label>
-          <input id="reset-email" type="email" autoComplete="email" required value={email} onChange={event => setEmail(event.target.value)} style={inputStyle} />
+          <input id="reset-email" name="email" type="email" autoCapitalize="none" inputMode="email" maxLength={254} autoComplete="email" required value={email} onChange={event => setEmail(event.target.value)} style={inputStyle} />
           <label htmlFor="reset-code" style={{ ...labelStyle, marginTop: 14 }}>Six-digit code</label>
           <input id="reset-code" type="text" inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]{6}" maxLength={6} required value={code} onChange={event => setCode(event.target.value.replace(/\D/g, '').slice(0, 6))} style={inputStyle} />
           <label htmlFor="new-password" style={{ ...labelStyle, marginTop: 14 }}>New password</label>
@@ -49,7 +49,7 @@ export default function ResetPasswordPage() {
   )
 }
 
-const cardStyle = { maxWidth: 480, margin: '0 auto', padding: 'var(--space-xl)', background: 'var(--color-surface)', borderRadius: 'var(--radius-lg)', boxShadow: 'var(--shadow-sm)' }
+const cardStyle = { maxWidth: 480, margin: '0 auto', background: 'var(--color-surface)', borderRadius: 'var(--radius-lg)', boxShadow: 'var(--shadow-sm)' }
 const labelStyle = { display: 'block', marginBottom: 6, fontSize: 13, fontWeight: 600 }
 const inputStyle = { width: '100%', padding: '12px 14px', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', background: 'var(--color-bg)', color: 'var(--color-text-primary)', font: 'inherit' }
 const buttonStyle = { width: '100%', padding: 14, marginTop: 16, border: 0, borderRadius: 'var(--radius-lg)', background: 'var(--color-primary)', color: 'white', font: 'inherit', fontWeight: 700, cursor: 'pointer' }

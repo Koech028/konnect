@@ -24,12 +24,18 @@ export default function SignupPage() {
   })
 
   const handleChange = (field, value) => {
+    setError('')
     setFormData(prev => ({ ...prev, [field]: value }))
   }
 
   const handleSubmit = async (e) => {
     e.preventDefault()
     if (step < 4) {
+      if (step === 2 && !formData.gender) {
+        setError('Choose a gender to continue.')
+        return
+      }
+      setError('')
       setStep(step + 1)
       return
     }
@@ -55,7 +61,7 @@ export default function SignupPage() {
         return (
           <>
             <div style={{ marginBottom: 'var(--space-md)' }}>
-              <label style={{
+              <label htmlFor="signup-email" style={{
                 display: 'block',
                 fontSize: '14px',
                 fontWeight: 600,
@@ -64,7 +70,7 @@ export default function SignupPage() {
               }}>
                 Email
               </label>
-              <div style={{
+              <div className="auth-input-row" style={{
                 display: 'flex',
                 alignItems: 'center',
                 gap: '10px',
@@ -75,7 +81,14 @@ export default function SignupPage() {
               }}>
                 <Mail size={18} color="var(--color-text-muted)" />
                 <input
+                  id="signup-email"
                   type="email"
+                  name="email"
+                  autoComplete="email"
+                  autoCapitalize="none"
+                  spellCheck="false"
+                  inputMode="email"
+                  maxLength={254}
                   value={formData.email}
                   onChange={(e) => handleChange('email', e.target.value)}
                   placeholder="you@example.com"
@@ -94,7 +107,7 @@ export default function SignupPage() {
             </div>
 
             <div style={{ marginBottom: 'var(--space-lg)' }}>
-              <label style={{
+              <label htmlFor="signup-password" style={{
                 display: 'block',
                 fontSize: '14px',
                 fontWeight: 600,
@@ -103,7 +116,7 @@ export default function SignupPage() {
               }}>
                 Password
               </label>
-              <div style={{
+              <div className="auth-input-row" style={{
                 display: 'flex',
                 alignItems: 'center',
                 gap: '10px',
@@ -114,7 +127,10 @@ export default function SignupPage() {
               }}>
                 <Lock size={18} color="var(--color-text-muted)" />
                 <input
+                  id="signup-password"
                   type={showPassword ? 'text' : 'password'}
+                  name="new-password"
+                  autoComplete="new-password"
                   value={formData.password}
                   onChange={(e) => handleChange('password', e.target.value)}
                   placeholder="••••••••"
@@ -130,8 +146,11 @@ export default function SignupPage() {
                   }}
                 />
                 <button
+                  className="auth-password-toggle"
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                  aria-pressed={showPassword}
                   style={{
                     background: 'none',
                     border: 'none',
@@ -151,7 +170,7 @@ export default function SignupPage() {
         return (
           <>
             <div style={{ marginBottom: 'var(--space-md)' }}>
-              <label style={{
+              <label htmlFor="signup-display-name" style={{
                 display: 'block',
                 fontSize: '14px',
                 fontWeight: 600,
@@ -160,7 +179,7 @@ export default function SignupPage() {
               }}>
                 Display Name
               </label>
-              <div style={{
+              <div className="auth-input-row" style={{
                 display: 'flex',
                 alignItems: 'center',
                 gap: '10px',
@@ -171,7 +190,10 @@ export default function SignupPage() {
               }}>
                 <User size={18} color="var(--color-text-muted)" />
                 <input
+                  id="signup-display-name"
                   type="text"
+                  autoComplete="nickname"
+                  maxLength={40}
                   value={formData.display_name}
                   onChange={(e) => handleChange('display_name', e.target.value)}
                   placeholder="What should we call you?"
@@ -190,7 +212,7 @@ export default function SignupPage() {
             </div>
 
             <div style={{ marginBottom: 'var(--space-md)' }}>
-              <label style={{
+              <label htmlFor="signup-age" style={{
                 display: 'block',
                 fontSize: '14px',
                 fontWeight: 600,
@@ -199,7 +221,7 @@ export default function SignupPage() {
               }}>
                 Age
               </label>
-              <div style={{
+              <div className="auth-input-row" style={{
                 display: 'flex',
                 alignItems: 'center',
                 gap: '10px',
@@ -210,7 +232,10 @@ export default function SignupPage() {
               }}>
                 <Calendar size={18} color="var(--color-text-muted)" />
                 <input
+                  id="signup-age"
                   type="number"
+                  inputMode="numeric"
+                  autoComplete="off"
                   value={formData.age}
                   onChange={(e) => handleChange('age', e.target.value)}
                   placeholder="25"
@@ -240,7 +265,7 @@ export default function SignupPage() {
               }}>
                 Gender
               </label>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+              <div role="group" aria-label="Gender" style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
                 {[
                   { label: 'Woman', value: 'woman' },
                   { label: 'Man', value: 'man' },
@@ -250,6 +275,7 @@ export default function SignupPage() {
                     key={value}
                     type="button"
                     onClick={() => handleChange('gender', value)}
+                    aria-pressed={formData.gender === value}
                     style={{
                       padding: '10px 20px',
                       borderRadius: 'var(--radius-full)',
@@ -280,7 +306,7 @@ export default function SignupPage() {
         return (
           <>
             <div style={{ marginBottom: 'var(--space-lg)' }}>
-              <label style={{
+              <label htmlFor="signup-city" style={{
                 display: 'block',
                 fontSize: '14px',
                 fontWeight: 600,
@@ -289,7 +315,7 @@ export default function SignupPage() {
               }}>
                 Location (optional)
               </label>
-              <div style={{
+              <div className="auth-input-row" style={{
                 display: 'flex',
                 alignItems: 'center',
                 gap: '10px',
@@ -300,7 +326,10 @@ export default function SignupPage() {
               }}>
                 <MapPin size={18} color="var(--color-text-muted)" />
                 <input
+                  id="signup-city"
                   type="text"
+                  autoComplete="address-level2"
+                  maxLength={100}
                   value={formData.location.city}
                   onChange={(e) => handleChange('location', { ...formData.location, city: e.target.value })}
                   placeholder="City"
@@ -317,7 +346,7 @@ export default function SignupPage() {
               </div>
             </div>
 
-            <div style={{
+            <div role="progressbar" aria-label="Signup progress" aria-valuemin={1} aria-valuemax={4} aria-valuenow={step} style={{
               padding: 'var(--space-lg)',
               background: 'var(--color-primary-soft)',
               borderRadius: 'var(--radius-lg)',
@@ -416,15 +445,13 @@ export default function SignupPage() {
   }
 
   return (
-    <div style={{
-      minHeight: '100vh',
+    <div className="auth-page" style={{
       display: 'flex',
       flexDirection: 'column',
       justifyContent: 'center',
-      padding: 'var(--space-xl)',
       background: 'linear-gradient(135deg, var(--color-primary-soft), var(--color-secondary-soft))'
     }}>
-      <div style={{ maxWidth: '400px', width: '100%', margin: '0 auto' }}>
+      <div className="auth-shell">
         <div style={{ textAlign: 'center', marginBottom: 'var(--space-xl)' }}>
           <h1 style={{
             fontFamily: 'var(--font-display)',
@@ -463,19 +490,34 @@ export default function SignupPage() {
           </p>
         </div>
 
-        <form onSubmit={handleSubmit} style={{
+        <form onSubmit={handleSubmit} className="auth-card" style={{
           background: 'var(--color-surface)',
           borderRadius: 'var(--radius-xl)',
-          padding: 'var(--space-xl)',
           boxShadow: 'var(--shadow-lg)'
         }}>
           {renderStep()}
+
+          {error && (
+            <p role="alert" style={{
+              marginBottom: 'var(--space-md)',
+              padding: '12px 14px',
+              borderRadius: 'var(--radius-md)',
+              background: 'var(--color-primary-soft)',
+              color: 'var(--color-primary-dark)',
+              fontSize: '13px'
+            }}>
+              {error}
+            </p>
+          )}
 
           <div style={{ display: 'flex', gap: '12px' }}>
             {step > 1 && (
               <button
                 type="button"
-                onClick={() => setStep(step - 1)}
+                onClick={() => {
+                  setError('')
+                  setStep(step - 1)
+                }}
                 style={{
                   flex: 1,
                   padding: '14px',
@@ -504,14 +546,13 @@ export default function SignupPage() {
                 color: 'white',
                 fontSize: '15px',
                 fontWeight: 600,
-                cursor: isLoading ? 'not-allowed' : 'pointer',
+                cursor: isLoading ? 'wait' : 'pointer',
                 fontFamily: 'var(--font-sans)',
                 opacity: isLoading ? 0.8 : 1
               }}
             >
-              {isLoading ? 'Creating...' : step === 4 ? 'Create Account' : 'Continue'}
+              {isLoading ? 'Creating account…' : step === 4 ? 'Create account' : 'Continue'}
             </button>
-            {error && <p role="alert" style={{ color: 'var(--color-error)', fontSize: '13px', marginTop: '12px' }}>{error}</p>}
           </div>
 
           <div style={{
