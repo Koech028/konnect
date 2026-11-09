@@ -29,14 +29,14 @@ export default function ForgotPasswordPage() {
     <>
       <PageHeader title="Password help" backTo="/login" />
       <div style={{ padding: 'var(--space-md)' }}>
-        <form onSubmit={submit} style={cardStyle}>
+        <form onSubmit={submit} className="auth-card" style={cardStyle}>
           <div style={iconStyle}><Mail size={24} /></div>
           <h2 style={{ fontSize: '19px', textAlign: 'center', margin: '14px 0 6px' }}>Forgot your password?</h2>
           <p style={{ textAlign: 'center', color: 'var(--color-text-secondary)', fontSize: '14px', marginBottom: '20px' }}>
             Enter the email address associated with your account.
           </p>
           <label htmlFor="reset-email" style={labelStyle}>Email address</label>
-          <input id="reset-email" type="email" required value={email} onChange={event => setEmail(event.target.value)} placeholder="you@example.com" style={inputStyle} />
+          <input id="reset-email" name="email" type="email" autoComplete="email" autoCapitalize="none" inputMode="email" maxLength={254} required value={email} onChange={event => { setEmail(event.target.value); setSubmitted(false); setError('') }} placeholder="you@example.com" style={inputStyle} />
           <button type="submit" disabled={isLoading} style={buttonStyle}>{isLoading ? 'Sending...' : 'Continue'}</button>
           {submitted && (
             <div role="status" style={{ color: 'var(--color-success)', fontSize: '14px', marginTop: '14px' }}>
@@ -58,7 +58,7 @@ export default function ForgotPasswordPage() {
   )
 }
 
-const cardStyle = { maxWidth: '480px', margin: '0 auto', padding: 'var(--space-xl)', background: 'var(--color-surface)', borderRadius: 'var(--radius-lg)', boxShadow: 'var(--shadow-sm)' }
+const cardStyle = { maxWidth: '480px', margin: '0 auto', background: 'var(--color-surface)', borderRadius: 'var(--radius-lg)', boxShadow: 'var(--shadow-sm)' }
 const iconStyle = { width: '52px', height: '52px', margin: '0 auto', borderRadius: '50%', display: 'grid', placeItems: 'center', background: 'var(--color-primary-soft)', color: 'var(--color-primary)' }
 const labelStyle = { display: 'block', fontSize: '13px', fontWeight: 600, marginBottom: '6px' }
 const inputStyle = { width: '100%', padding: '12px 14px', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', background: 'var(--color-bg)', color: 'var(--color-text-primary)', font: 'inherit' }

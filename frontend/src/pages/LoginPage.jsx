@@ -10,30 +10,32 @@ export default function LoginPage() {
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState('')
 
   const handleSubmit = async (e) => {
     e.preventDefault()
     setIsLoading(true)
+    setError('')
     try {
       await login(email, password)
       navigate('/')
     } catch (err) {
-      console.error(err)
+      setError(err.status === 401
+        ? 'Email or password is incorrect. If you just signed up, verify your email first.'
+        : err.message || 'We could not sign you in. Please try again.')
     } finally {
       setIsLoading(false)
     }
   }
 
   return (
-    <div style={{
-      minHeight: '100vh',
+    <div className="auth-page" style={{
       display: 'flex',
       flexDirection: 'column',
       justifyContent: 'center',
-      padding: 'var(--space-xl)',
       background: 'linear-gradient(135deg, var(--color-primary-soft), var(--color-secondary-soft))'
     }}>
-      <div style={{ maxWidth: '400px', width: '100%', margin: '0 auto' }}>
+      <div className="auth-shell">
         <div style={{ textAlign: 'center', marginBottom: 'var(--space-2xl)' }}>
           <h1 style={{
             fontFamily: 'var(--font-display)',
@@ -49,14 +51,13 @@ export default function LoginPage() {
           </p>
         </div>
 
-        <form onSubmit={handleSubmit} style={{
+        <form onSubmit={handleSubmit} className="auth-card" style={{
           background: 'var(--color-surface)',
           borderRadius: 'var(--radius-xl)',
-          padding: 'var(--space-xl)',
           boxShadow: 'var(--shadow-lg)'
         }}>
           <div style={{ marginBottom: 'var(--space-md)' }}>
-            <label style={{
+            <label htmlFor="login-email" style={{
               display: 'block',
               fontSize: '14px',
               fontWeight: 600,
@@ -65,7 +66,7 @@ export default function LoginPage() {
             }}>
               Email
             </label>
-            <div style={{
+            <div className="auth-input-row" style={{
               display: 'flex',
               alignItems: 'center',
               gap: '10px',
@@ -76,26 +77,28 @@ export default function LoginPage() {
             }}>
               <Mail size={18} color="var(--color-text-muted)" />
               <input
+                id="login-email"
                 type="email"
+                name="email"
+                autoComplete="email"
+                autoCapitalize="none"
+                spellCheck="false"
+                inputMode="email"
+                maxLength={254}
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                onChange={(e) => {
+                  setEmail(e.target.value)
+                  setError('')
+                }}
                 placeholder="you@example.com"
                 required
-                style={{
-                  flex: 1,
-                  border: 'none',
-                  background: 'none',
-                  outline: 'none',
-                  fontSize: '15px',
-                  fontFamily: 'var(--font-sans)',
-                  color: 'var(--color-text-primary)'
-                }}
+                aria-invalid={Boolean(error)}
               />
             </div>
           </div>
 
           <div style={{ marginBottom: 'var(--space-lg)' }}>
-            <label style={{
+            <label htmlFor="login-password" style={{
               display: 'block',
               fontSize: '14px',
               fontWeight: 600,
@@ -104,7 +107,7 @@ export default function LoginPage() {
             }}>
               Password
             </label>
-            <div style={{
+            <div className="auth-input-row" style={{
               display: 'flex',
               alignItems: 'center',
               gap: '10px',
@@ -115,24 +118,25 @@ export default function LoginPage() {
             }}>
               <Lock size={18} color="var(--color-text-muted)" />
               <input
+                id="login-password"
                 type={showPassword ? 'text' : 'password'}
+                name="password"
+                autoComplete="current-password"
                 value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                onChange={(e) => {
+                  setPassword(e.target.value)
+                  setError('')
+                }}
                 placeholder="••••••••"
                 required
-                style={{
-                  flex: 1,
-                  border: 'none',
-                  background: 'none',
-                  outline: 'none',
-                  fontSize: '15px',
-                  fontFamily: 'var(--font-sans)',
-                  color: 'var(--color-text-primary)'
-                }}
+                aria-invalid={Boolean(error)}
               />
               <button
+                className="auth-password-toggle"
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
+                aria-label={showPassword ? 'Hide password' : 'Show password'}
+                aria-pressed={showPassword}
                 style={{
                   background: 'none',
                   border: 'none',
@@ -151,9 +155,27 @@ export default function LoginPage() {
             </div>
           </div>
 
+          {error && (
+            <div role="alert" style={{
+              marginBottom: 'var(--space-md)',
+              padding: '12px 14px',
+              borderRadius: 'var(--radius-md)',
+              background: 'var(--color-primary-soft)',
+              color: 'var(--color-primary-dark)',
+              fontSize: '13px'
+            }}>
+              {error}{' '}
+              {errNeedsVerification(error) && (
+                <Link to={`/verify-email?email=${encodeURIComponent(email.trim())}`} style={{ color: 'inherit', fontWeight: 700 }}>
+                  Verify your email
+                </Link>
+              )}
+            </div>
+          )}
+
           <button
             type="submit"
-            disabled={isLoading}
+            disabled={isLoading || !email.trim() || !password}
             style={{
               width: '100%',
               padding: '14px',
@@ -163,12 +185,12 @@ export default function LoginPage() {
               color: 'white',
               fontSize: '16px',
               fontWeight: 600,
-              cursor: isLoading ? 'not-allowed' : 'pointer',
+              cursor: isLoading ? 'wait' : 'pointer',
               fontFamily: 'var(--font-sans)',
               opacity: isLoading ? 0.8 : 1
             }}
           >
-            {isLoading ? 'Signing in...' : 'Sign In'}
+            {isLoading ? 'Signing in…' : 'Sign in'}
           </button>
 
           <div style={{
@@ -192,4 +214,8 @@ export default function LoginPage() {
       </div>
     </div>
   )
+}
+
+function errNeedsVerification(error) {
+  return error.includes('verify your email')
 }
